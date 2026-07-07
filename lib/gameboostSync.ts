@@ -64,17 +64,38 @@ function normalize(o: RawOrder, kind: string): Order {
   };
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Retries transient GameBoost failures - rate limits (429) and Cloudflare/origin
+// timeouts (5xx, e.g. 522) - with short backoff, so a momentary hiccup on one
+// page doesn't fail the whole refresh.
 async function apiGet(pathq: string, key: string): Promise<Record<string, unknown>> {
-  const res = await fetch(`${API_BASE}${pathq}`, {
-    headers: {
-      Authorization: `Bearer ${key}`,
-      Accept: "application/json",
-      "User-Agent": "VBucksRelay-Sync/1.0",
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`GameBoost ${pathq} returned ${res.status}`);
-  return res.json();
+  let lastError = "unknown error";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}${pathq}`, {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          Accept: "application/json",
+          "User-Agent": "VBucksRelay-Sync/1.0",
+        },
+        cache: "no-store",
+      });
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : "network error";
+      await sleep(600 * (attempt + 1));
+      continue;
+    }
+    if (res.ok) return res.json();
+    if (res.status === 429 || res.status >= 500) {
+      lastError = `returned ${res.status}`;
+      await sleep(600 * (attempt + 1));
+      continue;
+    }
+    throw new Error(`GameBoost ${pathq} returned ${res.status}`);
+  }
+  throw new Error(`GameBoost ${pathq} ${lastError} (after retries)`);
 }
 
 async function pullAll(endpoint: string, kind: string, key: string): Promise<Order[]> {
@@ -133,7 +154,14 @@ export async function syncGameboost(): Promise<SyncReport> {
   orders.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
 
   // Upsert into the shared orders table, tagged as the GameBoost workspace.
-  const rows = orders.map((o) => ({ ...o, workspace: "gameboost", currency: "USD" }));
+  // The API has no supplier cost, so we OMIT cost/supplier/profit from the
+  // upsert - that way any values you've filled in (from your sheet) are never
+  // overwritten by a refresh. New orders simply start with those blank.
+  const rows = orders.map((o) => {
+    const { cost, supplier, profit, ...rest } = o;
+    void cost; void supplier; void profit;
+    return { ...rest, workspace: "gameboost", currency: "USD" };
+  });
   const client = db();
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500);

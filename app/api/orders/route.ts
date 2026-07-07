@@ -73,14 +73,15 @@ export async function PUT(req: Request) {
     if (!id) return bad("Missing order id.");
     const parsed = parseFields(body);
     if (!parsed.ok) return bad(parsed.error);
+    // Any order can be edited (e.g. adding supplier cost to a GameBoost order).
+    // The GameBoost sync omits cost/supplier/profit, so those edits survive a refresh.
     const { data, error } = await db()
       .from("orders")
       .update(parsed.fields)
       .eq("order_id", id)
-      .eq("source", "manual")
       .select();
     if (error) throw new Error(error.message);
-    if (!data || data.length === 0) return bad("Only manually-added orders can be edited.", 404);
+    if (!data || data.length === 0) return bad("Order not found.", 404);
     return NextResponse.json({ ok: true, order: data[0] });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed to edit order", 500);
