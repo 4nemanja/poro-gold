@@ -10,6 +10,13 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Marketplace webhooks (G2G, iGV) are called by external services with no
+  // session cookie — they authenticate via their own HMAC signature, verified
+  // inside each route handler. They must bypass the app's cookie auth.
+  if (pathname.startsWith("/api/webhooks/")) {
+    return NextResponse.next();
+  }
+
   const user = verify(req.cookies.get(COOKIE)?.value);
   if (user) return NextResponse.next();
 
