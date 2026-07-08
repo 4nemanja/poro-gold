@@ -8,6 +8,7 @@ const PRESETS = [
   { key: "7d", label: "7 Days" },
   { key: "30d", label: "30 Days" },
   { key: "90d", label: "3 Months" },
+  { key: "all", label: "All" },
 ];
 
 function todayISO() {
@@ -20,12 +21,12 @@ function shift(dateISO: string, delta: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function PeriodFilter() {
+export function PeriodFilter({ defaultRange = "today" }: { defaultRange?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
   const day = sp.get("day");
-  const range = sp.get("range") ?? "today";
+  const range = sp.get("range") ?? defaultRange;
 
   function setRange(key: string) {
     const params = new URLSearchParams(sp.toString());

@@ -3,23 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, X } from "lucide-react";
-import type { GiftOrder } from "@/lib/data";
+import type { SupplierRecord } from "@/lib/types";
 
-const STATUSES = [
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed", label: "Completed" },
-  { value: "refunded", label: "Refunded" },
-];
-
-// Add (no gift) or edit (gift provided) a V-Bucks gift sale.
-export function GiftModal({ gift }: { gift?: GiftOrder }) {
+// Add (no supplier) or edit (supplier provided) a managed supplier.
+export function SupplierModal({ supplier }: { supplier?: SupplierRecord }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [system, setSystem] = useState<"FIXED" | "SPLIT">(supplier?.profit_system ?? "FIXED");
 
-  const isEdit = !!gift;
-  const today = new Date().toISOString().slice(0, 10);
+  const isEdit = !!supplier;
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -27,10 +21,10 @@ export function GiftModal({ gift }: { gift?: GiftOrder }) {
     setError(null);
     const fd = new FormData(e.currentTarget);
     const payload: Record<string, unknown> = Object.fromEntries(fd.entries());
-    if (isEdit) payload.id = gift!.id;
+    if (isEdit) payload.original_name = supplier!.name;
     try {
-      const res = await fetch("/api/gifts", {
-        method: isEdit ? "PUT" : "POST",
+      const res = await fetch("/api/suppliers", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -48,12 +42,12 @@ export function GiftModal({ gift }: { gift?: GiftOrder }) {
   return (
     <>
       {isEdit ? (
-        <button onClick={() => setOpen(true)} title="Edit gift" className="text-zinc-400 hover:text-sky-600 transition-colors">
+        <button onClick={() => setOpen(true)} title="Edit supplier" className="text-zinc-400 hover:text-sky-600 transition-colors">
           <Pencil size={15} />
         </button>
       ) : (
         <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 text-white px-4 py-2 text-sm font-medium hover:bg-zinc-800 transition-colors">
-          <Plus size={16} /> Add Gift
+          <Plus size={16} /> Add Supplier
         </button>
       )}
 
@@ -61,44 +55,32 @@ export function GiftModal({ gift }: { gift?: GiftOrder }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg bg-white rounded-xl shadow-xl border border-zinc-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200">
-              <h3 className="text-sm font-semibold text-zinc-900">{isEdit ? "Edit Gift" : "Add Gift Sale"}</h3>
+              <h3 className="text-sm font-semibold text-zinc-900">{isEdit ? "Edit Supplier" : "Add Supplier"}</h3>
               <button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
             <form onSubmit={submit} className="p-5 space-y-4">
+              <Field label="Name">
+                <input name="name" defaultValue={supplier?.name ?? ""} placeholder="e.g. ESLAM" className={cls} required />
+              </Field>
+              <Field label="Description (what they do)">
+                <textarea name="description" defaultValue={supplier?.description ?? ""} placeholder="e.g. V-Bucks via Epic, fast delivery" rows={2} className={cls} />
+              </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Date">
-                  <input name="date" type="date" defaultValue={gift?.date ?? today} className={cls} required />
-                </Field>
-                <Field label="Customer">
-                  <input name="customer" defaultValue={gift?.customer ?? ""} placeholder="name / handle" className={cls} />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="V-Bucks Amount">
-                  <input name="vbucks" type="number" step="1" min="0" defaultValue={gift?.vbucks ?? ""} placeholder="1000" className={cls} required />
-                </Field>
-                <Field label="Status">
-                  <select name="status" defaultValue={gift?.status ?? "in_progress"} className={cls}>
-                    {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                <Field label="Profit System">
+                  <select name="profit_system" value={system} onChange={(e) => setSystem(e.target.value as "FIXED" | "SPLIT")} className={cls}>
+                    <option value="FIXED">FIXED (you keep all profit)</option>
+                    <option value="SPLIT">SPLIT (supplier takes a share)</option>
                   </select>
                 </Field>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <Field label="Sold For ($)">
-                  <input name="sold_for" type="number" step="0.01" min="0" defaultValue={gift?.sold_for ?? ""} placeholder="0.00" className={cls} />
-                </Field>
-                <Field label="Cost ($)">
-                  <input name="cost" type="number" step="0.01" min="0" defaultValue={gift?.cost ?? ""} placeholder="0.00" className={cls} />
-                </Field>
-                <Field label="Fee ($)">
-                  <input name="fee" type="number" step="0.01" min="0" defaultValue={gift?.fee ?? ""} placeholder="0.00" className={cls} />
+                <Field label="Supplier Share % (SPLIT)">
+                  <input name="share_pct" type="number" step="1" min="0" max="100" defaultValue={supplier?.share_pct ?? ""} placeholder="e.g. 50" disabled={system === "FIXED"} className={`${cls} disabled:bg-zinc-100 disabled:text-zinc-400`} />
                 </Field>
               </div>
               {error && <p className="text-sm text-rose-600">{error}</p>}
               <div className="flex justify-end gap-3 pt-1">
                 <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50">Cancel</button>
                 <button type="submit" disabled={saving} className="rounded-lg bg-zinc-900 text-white px-4 py-2 text-sm font-medium hover:bg-zinc-800 disabled:opacity-60">
-                  {saving ? "Saving..." : isEdit ? "Save Changes" : "Add Gift"}
+                  {saving ? "Saving..." : isEdit ? "Save Changes" : "Add Supplier"}
                 </button>
               </div>
             </form>

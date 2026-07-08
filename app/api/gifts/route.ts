@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
+import { setGiftExtra } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 const VALID = ["in_progress", "completed", "refunded"];
@@ -19,8 +20,11 @@ function parse(body: Record<string, unknown>) {
   if (sold != null && Number.isNaN(sold)) return { error: "Sold-for must be a number." };
   const cost = body.cost === "" || body.cost == null ? null : Number(body.cost);
   if (cost != null && Number.isNaN(cost)) return { error: "Cost must be a number." };
+  const fee = body.fee === "" || body.fee == null ? null : Number(body.fee);
+  if (fee != null && (Number.isNaN(fee) || fee < 0)) return { error: "Fee must be a positive number." };
   return {
     fields: { date, customer: String(body.customer ?? "").trim() || null, vbucks, sold_for: sold, cost, status },
+    fee,
   };
 }
 
@@ -31,6 +35,7 @@ export async function POST(req: Request) {
     const order = { id: `GIFT-${Date.now().toString(36).toUpperCase()}`, added_at: new Date().toISOString(), ...p.fields };
     const { error } = await db().from("gift_orders").insert(order);
     if (error) throw new Error(error.message);
+    await setGiftExtra(order.id, p.fee ?? null);
     return NextResponse.json({ ok: true, order });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed", 500);
@@ -47,6 +52,7 @@ export async function PUT(req: Request) {
     const { data, error } = await db().from("gift_orders").update(p.fields).eq("id", id).select();
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return bad("Gift not found.", 404);
+    await setGiftExtra(id, p.fee ?? null);
     return NextResponse.json({ ok: true, order: data[0] });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed", 500);
@@ -60,6 +66,7 @@ export async function DELETE(req: Request) {
     const { data, error } = await db().from("gift_orders").delete().eq("id", id).select();
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return bad("Gift not found.", 404);
+    await setGiftExtra(id, null);
     return NextResponse.json({ ok: true, deleted: id });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed", 500);

@@ -1,12 +1,14 @@
-import { sumRevenue } from "@/lib/data";
+import { sumRevenue, sumProfit } from "@/lib/data";
 import { loadOrders, resolvePeriod, inRange, makeStatusMatch, addDateFor, type ViewParams } from "@/lib/ordersView";
 import { isCompleted, isInProgress } from "@/lib/orderStatus";
+import { getWorkspace } from "@/lib/workspaces";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card } from "@/components/ui/Card";
 import { OrderModal } from "@/components/OrderModal";
 import { OrdersTable } from "@/components/OrdersTable";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { StatusFilter } from "@/components/StatusFilter";
+import { WebsiteFilter } from "@/components/WebsiteFilter";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import { ClipboardList, CheckCircle2, Clock, DollarSign } from "lucide-react";
 
@@ -16,38 +18,46 @@ const MAX = 50;
 export default async function MainDashboard({
   searchParams,
 }: {
-  searchParams: Promise<ViewParams>;
+  searchParams: Promise<ViewParams & { ws?: string }>;
 }) {
   const sp = await searchParams;
   const { from, to, label } = resolvePeriod(sp);
   const statusMatch = makeStatusMatch(sp);
+  const ws = sp.ws ? getWorkspace(sp.ws) : null;
 
   const { all } = await loadOrders();
-  const visible = all.filter((o) => inRange(o, from, to) && statusMatch(o));
+  const visible = all.filter(
+    (o) => inRange(o, from, to) && statusMatch(o) && (!ws || o.workspace === ws.slug),
+  );
   const completed = visible.filter((o) => isCompleted(o.status));
   const inProgress = visible.filter((o) => isInProgress(o.status));
   const revenue = sumRevenue(visible);
+  const profit = sumProfit(visible);
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Main Dashboard</h1>
-          <p className="text-sm text-zinc-500 mt-1">What happened across all your websites {label}.</p>
+          <p className="text-sm text-zinc-500 mt-1">
+            {ws ? `${ws.name} sales` : "What happened across all your websites"} {label}.
+          </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap justify-end">
+          <WebsiteFilter />
           <PeriodFilter />
-          <OrderModal defaultDate={addDateFor(sp)} />
+          <OrderModal defaultDate={addDateFor(sp)} defaultWorkspace={ws?.slug} />
         </div>
       </div>
 
       <StatusFilter />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard label="Orders" value={formatNum(visible.length)} icon={<ClipboardList size={18} />} />
         <StatCard label="In Progress" value={formatNum(inProgress.length)} icon={<Clock size={18} />} iconClass="bg-amber-50 text-amber-600" />
         <StatCard label="Completed" value={formatNum(completed.length)} icon={<CheckCircle2 size={18} />} iconClass="bg-emerald-50 text-emerald-600" />
         <StatCard label="Revenue" value={formatCurrencyPrecise(revenue)} icon={<DollarSign size={18} />} iconClass="bg-sky-50 text-sky-600" />
+        <StatCard label="Profit" value={formatCurrencyPrecise(profit)} icon={<DollarSign size={18} />} iconClass="bg-emerald-50 text-emerald-600" />
       </div>
 
       <Card

@@ -1,10 +1,11 @@
-import { sumRevenue } from "@/lib/data";
+import { sumRevenue, getWithdrawalFees } from "@/lib/data";
 import { WORKSPACES } from "@/lib/workspaces";
 import { loadOrders, resolvePeriod, inRange, makeStatusMatch, type ViewParams } from "@/lib/ordersView";
 import { isCompleted } from "@/lib/orderStatus";
 import { Card } from "@/components/ui/Card";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { StatusFilter } from "@/components/StatusFilter";
+import { WithdrawalFeeCell } from "@/components/WithdrawalFeeCell";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import { platformBadgeClass } from "@/lib/platformBadge";
 
@@ -16,9 +17,11 @@ export default async function ByWebsite({
   searchParams: Promise<ViewParams>;
 }) {
   const sp = await searchParams;
-  const { from, to, label } = resolvePeriod(sp);
+  // Default to all-time here so every recorded sale shows up. A "today"-only
+  // default previously hid any sale not dated today, which read as a bug.
+  const { from, to, label } = resolvePeriod(sp, "all");
   const statusMatch = makeStatusMatch(sp);
-  const { perWs } = await loadOrders();
+  const [{ perWs }, fees] = await Promise.all([loadOrders(), getWithdrawalFees()]);
 
   const rows = WORKSPACES.map((w, i) => {
     const p = perWs[i].filter((o) => inRange(o, from, to) && statusMatch(o));
@@ -27,6 +30,7 @@ export default async function ByWebsite({
       orders: p.length,
       completed: p.filter((o) => isCompleted(o.status)).length,
       revenue: sumRevenue(p),
+      withdrawalFee: fees[w.slug] ?? 0,
     };
   });
 
@@ -37,7 +41,7 @@ export default async function ByWebsite({
           <h1 className="text-2xl font-bold text-zinc-900">By Website</h1>
           <p className="text-sm text-zinc-500 mt-1">Per-marketplace totals {label}.</p>
         </div>
-        <PeriodFilter />
+        <PeriodFilter defaultRange="all" />
       </div>
 
       <StatusFilter />
@@ -51,6 +55,7 @@ export default async function ByWebsite({
               <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Orders</th>
               <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Completed</th>
               <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Revenue</th>
+              <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Withdrawal Fee</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200">
@@ -65,6 +70,9 @@ export default async function ByWebsite({
                 <td className="py-4 text-sm font-mono text-zinc-700 text-right">{formatNum(b.orders)}</td>
                 <td className="py-4 text-sm font-mono text-zinc-700 text-right">{formatNum(b.completed)}</td>
                 <td className="py-4 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(b.revenue)}</td>
+                <td className="py-4 text-sm text-right">
+                  <WithdrawalFeeCell slug={b.slug} pct={b.withdrawalFee} />
+                </td>
               </tr>
             ))}
           </tbody>

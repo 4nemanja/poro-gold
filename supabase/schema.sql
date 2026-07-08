@@ -56,7 +56,17 @@ create table if not exists skus (
   active    boolean default true
 );
 
--- Singletons (investment config, gift config, last GameBoost sync report).
+-- Singletons + small key/value config, all JSONB. Keys in use:
+--   investment       - capital/treasury config
+--   gift_config      - gift system config
+--   sync_report      - last GameBoost sync summary
+--   suppliers        - managed suppliers [{name, description, profit_system, share_pct}]
+--   withdrawal_fees  - editable per-platform withdrawal fee %, keyed by workspace slug
+--   order_extras     - per-order {fee, supplier_share_pct, supplier_cut}, keyed by order_id
+--   gift_extras      - per-gift {fee}, keyed by gift id
+-- order_extras/gift_extras live here because the orders/gift_orders tables can't
+-- be altered from the app. `profit` (a real orders column) already nets out fee
+-- and supplier split; the extras are for display + the Profit & Costs breakdown.
 create table if not exists app_config (
   key   text primary key,
   value jsonb

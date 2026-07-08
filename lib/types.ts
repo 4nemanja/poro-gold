@@ -25,6 +25,21 @@ export type Order = {
   // Present on manually-added orders.
   workspace?: string;
   added_at?: string; // ISO timestamp when logged - used to keep newest on top
+  // Fee (marketplace/payment) and supplier profit-split, stored in app_config
+  // (order_extras) since the orders table schema can't be altered. `profit`
+  // already reflects both; these are kept for display + the Costs breakdown.
+  fee?: number | null;
+  supplier_share_pct?: number | null; // % of gross profit the supplier takes
+  supplier_cut?: number | null; // $ the supplier takes from gross profit
+};
+
+// A supplier the user manages by hand. FIXED = you keep all profit; SPLIT = the
+// supplier takes a share of each order's profit. Stored in app_config.
+export type SupplierRecord = {
+  name: string;
+  description: string;
+  profit_system: "FIXED" | "SPLIT";
+  share_pct: number; // default % of profit the supplier takes on SPLIT orders
 };
 
 export type Platform = {

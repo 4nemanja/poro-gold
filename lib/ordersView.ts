@@ -9,11 +9,13 @@ export function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function resolvePeriod(sp?: ViewParams) {
+export function resolvePeriod(sp?: ViewParams, defaultRange = "today") {
   const day = sp?.day;
   if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) return { from: day, to: day, label: `on ${day}` };
-  const range = sp?.range ?? "today";
+  const range = sp?.range ?? defaultRange;
   const today = todayISO();
+  // "all" = everything since the business started (no upper bound).
+  if (range === "all") return { from: "0000-01-01", to: "9999-12-31", label: "all time" };
   if (range === "today") return { from: today, to: today, label: "today" };
   const days = range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 1;
   const from = new Date(Date.now() - (days - 1) * 86400000).toISOString().slice(0, 10);

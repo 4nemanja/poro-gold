@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { getWorkspace } from "@/lib/workspaces";
+import { computeOrderProfit, setOrderExtra } from "@/lib/data";
 
 // Manually-added orders live in the shared `orders` table with source='manual'.
 // Only manual rows can be edited/deleted (API/Excel rows are read-only).
@@ -9,8 +10,9 @@ export const dynamic = "force-dynamic";
 const VALID_STATUS = ["completed", "in_delivery", "refunded", "cancelled"];
 
 type Fields = Record<string, unknown>;
+type Extra = { fee?: number; supplier_share_pct?: number; supplier_cut?: number };
 
-function parseFields(body: Record<string, unknown>): { ok: false; error: string } | { ok: true; fields: Fields } {
+function parseFields(body: Record<string, unknown>): { ok: false; error: string } | { ok: true; fields: Fields; extra: Extra } {
   const ws = getWorkspace(String(body.workspace ?? ""));
   if (!ws) return { ok: false, error: "Pick a valid website." };
   const product = String(body.product ?? "").trim();
@@ -24,6 +26,18 @@ function parseFields(body: Record<string, unknown>): { ok: false; error: string 
   const costRaw = body.cost;
   const cost = costRaw === "" || costRaw == null ? null : Number(costRaw);
   if (cost != null && Number.isNaN(cost)) return { ok: false, error: "Supplier cost must be a number." };
+  const feeRaw = body.fee;
+  const fee = feeRaw === "" || feeRaw == null ? null : Number(feeRaw);
+  if (fee != null && (Number.isNaN(fee) || fee < 0)) return { ok: false, error: "Fee must be a positive number." };
+  const shareRaw = body.supplier_share_pct;
+  const sharePct = shareRaw === "" || shareRaw == null ? null : Number(shareRaw);
+  if (sharePct != null && (Number.isNaN(sharePct) || sharePct < 0 || sharePct > 100))
+    return { ok: false, error: "Supplier profit share must be between 0 and 100." };
+
+  // Profit is net of fee and any supplier profit-split. It's the authoritative
+  // money figure and lives in the real `profit` column; fee/share/cut are kept
+  // as annotations (app_config) via `extra`.
+  const { supplierCut, profit } = computeOrderProfit(soldFor, cost, fee, sharePct);
   return {
     ok: true,
     fields: {
@@ -33,12 +47,13 @@ function parseFields(body: Record<string, unknown>): { ok: false; error: string 
       supplier: String(body.supplier ?? "").trim() || null,
       cost,
       sold_for: soldFor,
-      profit: cost != null ? Math.round((soldFor - cost) * 100) / 100 : null,
+      profit: cost != null || fee != null ? profit : null,
       status,
       method: String(body.method ?? "").trim() || null,
       currency: String(body.currency ?? "USD").trim().toUpperCase() || "USD",
       workspace: ws.slug,
     },
+    extra: { fee: fee ?? undefined, supplier_share_pct: sharePct ?? undefined, supplier_cut: supplierCut || undefined },
   };
 }
 
@@ -60,6 +75,7 @@ export async function POST(req: Request) {
     };
     const { error } = await db().from("orders").insert(order);
     if (error) throw new Error(error.message);
+    await setOrderExtra(order.order_id, parsed.extra);
     return NextResponse.json({ ok: true, order });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed to add order", 500);
@@ -82,6 +98,7 @@ export async function PUT(req: Request) {
       .select();
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return bad("Order not found.", 404);
+    await setOrderExtra(id, parsed.extra);
     return NextResponse.json({ ok: true, order: data[0] });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed to edit order", 500);
@@ -100,6 +117,7 @@ export async function DELETE(req: Request) {
       .select();
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return bad("Only manually-added orders can be deleted.", 404);
+    await setOrderExtra(id, null);
     return NextResponse.json({ ok: true, deleted: id });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed to delete order", 500);

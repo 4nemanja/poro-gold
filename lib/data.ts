@@ -1,5 +1,5 @@
 import { db } from "./supabase";
-import type { Order } from "./types";
+import type { Order, SupplierRecord } from "./types";
 
 // Business started 2026-07-01. GameBoost's API carries years of history;
 // everything before this date is hidden across the whole app.
@@ -49,20 +49,51 @@ export function orderRecencySort(a: Order, b: Order): number {
   return (b.added_at ?? "").localeCompare(a.added_at ?? "");
 }
 
+// Per-order fee / supplier-split annotations. The orders table schema can't be
+// altered from here, so these live in app_config keyed by order_id. `profit`
+// (a real column) already nets them out; these are for display + cost breakdown.
+export type OrderExtra = { fee?: number; supplier_share_pct?: number; supplier_cut?: number };
+export type OrderExtras = Record<string, OrderExtra>;
+
+export async function getOrderExtras(): Promise<OrderExtras> {
+  return getConfig<OrderExtras>("order_extras", {});
+}
+
+export async function setOrderExtra(orderId: string, extra: OrderExtra | null): Promise<void> {
+  const all = await getOrderExtras();
+  if (extra && (extra.fee || extra.supplier_share_pct || extra.supplier_cut)) all[orderId] = extra;
+  else delete all[orderId];
+  await setConfig("order_extras", all);
+}
+
+function mergeExtras(orders: Order[], extras: OrderExtras): Order[] {
+  for (const o of orders) {
+    const e = extras[o.order_id];
+    if (e) {
+      o.fee = e.fee ?? null;
+      o.supplier_share_pct = e.supplier_share_pct ?? null;
+      o.supplier_cut = e.supplier_cut ?? null;
+    }
+  }
+  return orders;
+}
+
 export async function getAllOrders(): Promise<Order[]> {
-  const { data, error } = await db().from("orders").select("*").gte("date", BUSINESS_START);
+  const [{ data, error }, extras] = await Promise.all([
+    db().from("orders").select("*").gte("date", BUSINESS_START),
+    getOrderExtras(),
+  ]);
   if (error) throw new Error(`orders query failed: ${error.message}`);
-  return (data ?? []).map(rowToOrder).sort(orderRecencySort);
+  return mergeExtras((data ?? []).map(rowToOrder), extras).sort(orderRecencySort);
 }
 
 export async function getWorkspaceOrders(workspace: string): Promise<Order[]> {
-  const { data, error } = await db()
-    .from("orders")
-    .select("*")
-    .eq("workspace", workspace)
-    .gte("date", BUSINESS_START);
+  const [{ data, error }, extras] = await Promise.all([
+    db().from("orders").select("*").eq("workspace", workspace).gte("date", BUSINESS_START),
+    getOrderExtras(),
+  ]);
   if (error) throw new Error(`orders query failed: ${error.message}`);
-  return (data ?? []).map(rowToOrder).sort(orderRecencySort);
+  return mergeExtras((data ?? []).map(rowToOrder), extras).sort(orderRecencySort);
 }
 
 // --- SKU catalog ---
@@ -116,27 +147,66 @@ export type GiftOrder = {
   vbucks: number;
   sold_for: number | null;
   cost: number | null;
+  fee: number | null; // stored in app_config (gift_extras); schema can't be altered
   status: string; // in_progress | completed | refunded
   added_at?: string;
 };
+
+// Per-gift fee lives in app_config (the gift_orders table can't be altered here).
+export type GiftExtras = Record<string, { fee?: number }>;
+export async function getGiftExtras(): Promise<GiftExtras> {
+  return getConfig<GiftExtras>("gift_extras", {});
+}
+export async function setGiftExtra(id: string, fee: number | null): Promise<void> {
+  const all = await getGiftExtras();
+  if (fee) all[id] = { fee };
+  else delete all[id];
+  await setConfig("gift_extras", all);
+}
 
 export async function getGiftConfig(): Promise<GiftConfig> {
   return getConfig<GiftConfig>("gift_config", { invested_usd: 33, vbucks_stock: 12500, note: "" });
 }
 
 export async function getGiftOrders(): Promise<GiftOrder[]> {
-  const { data, error } = await db().from("gift_orders").select("*");
+  const [{ data, error }, extras] = await Promise.all([
+    db().from("gift_orders").select("*"),
+    getGiftExtras(),
+  ]);
   if (error) throw new Error(`gift_orders query failed: ${error.message}`);
-  return (data ?? []).map((r) => ({
-    id: r.id as string,
-    date: (r.date as string) ?? "",
-    customer: (r.customer as string) ?? null,
-    vbucks: num(r.vbucks) ?? 0,
-    sold_for: num(r.sold_for),
-    cost: num(r.cost),
-    status: (r.status as string) ?? "in_progress",
-    added_at: (r.added_at as string) ?? undefined,
-  }));
+  return (data ?? []).map((r) => {
+    const id = r.id as string;
+    return {
+      id,
+      date: (r.date as string) ?? "",
+      customer: (r.customer as string) ?? null,
+      vbucks: num(r.vbucks) ?? 0,
+      sold_for: num(r.sold_for),
+      cost: num(r.cost),
+      fee: extras[id]?.fee ?? null,
+      status: (r.status as string) ?? "in_progress",
+      added_at: (r.added_at as string) ?? undefined,
+    };
+  });
+}
+
+// --- Suppliers (managed by hand; stored in app_config) ---
+export async function getSuppliers(): Promise<SupplierRecord[]> {
+  return getConfig<SupplierRecord[]>("suppliers", []);
+}
+export async function saveSuppliers(list: SupplierRecord[]): Promise<void> {
+  await setConfig("suppliers", list);
+}
+
+// --- Per-platform withdrawal fees (editable %, keyed by workspace slug) ---
+export type WithdrawalFees = Record<string, number>;
+export async function getWithdrawalFees(): Promise<WithdrawalFees> {
+  return getConfig<WithdrawalFees>("withdrawal_fees", {});
+}
+export async function setWithdrawalFee(slug: string, pct: number): Promise<void> {
+  const all = await getWithdrawalFees();
+  all[slug] = pct;
+  await setConfig("withdrawal_fees", all);
 }
 
 // --- Pure aggregation helpers ---
@@ -148,4 +218,26 @@ export function sumCost(orders: Order[]): number {
 }
 export function sumProfit(orders: Order[]): number {
   return orders.reduce((acc, o) => acc + (o.profit ?? 0), 0);
+}
+export function sumFees(orders: Order[]): number {
+  return orders.reduce((acc, o) => acc + (o.fee ?? 0), 0);
+}
+export function sumSupplierCuts(orders: Order[]): number {
+  return orders.reduce((acc, o) => acc + (o.supplier_cut ?? 0), 0);
+}
+
+// Net profit math for a single order, given a fee and the supplier's share % of
+// the gross profit. Returns the fee-adjusted gross, the supplier's cut, and your
+// net profit. Supplier only shares in a positive gross (never covers a loss).
+export function computeOrderProfit(
+  soldFor: number,
+  cost: number | null,
+  fee: number | null,
+  sharePct: number | null,
+): { gross: number; supplierCut: number; profit: number } {
+  const gross = Math.round((soldFor - (cost ?? 0) - (fee ?? 0)) * 100) / 100;
+  const pct = sharePct && sharePct > 0 ? Math.min(sharePct, 100) : 0;
+  const supplierCut = gross > 0 && pct > 0 ? Math.round(gross * (pct / 100) * 100) / 100 : 0;
+  const profit = Math.round((gross - supplierCut) * 100) / 100;
+  return { gross, supplierCut, profit };
 }
