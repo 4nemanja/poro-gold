@@ -1,5 +1,12 @@
 import { db } from "./supabase";
+import { statusCategory } from "./orderStatus";
 import type { Order, SupplierRecord } from "./types";
+
+// A refunded or cancelled order earned no profit — never count it.
+function earnsProfit(o: Order): boolean {
+  const c = statusCategory(o.status);
+  return c !== "refunded" && c !== "cancelled";
+}
 
 // Business started 2026-07-01. GameBoost's API carries years of history;
 // everything before this date is hidden across the whole app.
@@ -227,7 +234,7 @@ export function sumCost(orders: Order[]): number {
   return orders.reduce((acc, o) => acc + (o.cost ?? 0), 0);
 }
 export function sumProfit(orders: Order[]): number {
-  return orders.reduce((acc, o) => acc + (o.profit ?? 0), 0);
+  return orders.reduce((acc, o) => acc + (earnsProfit(o) ? o.profit ?? 0 : 0), 0);
 }
 export function sumFees(orders: Order[]): number {
   return orders.reduce((acc, o) => acc + (o.fee ?? 0), 0);
