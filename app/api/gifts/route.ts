@@ -20,11 +20,11 @@ function parse(body: Record<string, unknown>) {
   if (sold != null && Number.isNaN(sold)) return { error: "Sold-for must be a number." };
   const cost = body.cost === "" || body.cost == null ? null : Number(body.cost);
   if (cost != null && Number.isNaN(cost)) return { error: "Cost must be a number." };
-  const fee = body.fee === "" || body.fee == null ? null : Number(body.fee);
-  if (fee != null && (Number.isNaN(fee) || fee < 0)) return { error: "Fee must be a positive number." };
+  const feePct = body.fee_pct === "" || body.fee_pct == null ? null : Number(body.fee_pct);
+  if (feePct != null && (Number.isNaN(feePct) || feePct < 0 || feePct > 100)) return { error: "Fee % must be between 0 and 100." };
   return {
     fields: { date, customer: String(body.customer ?? "").trim() || null, vbucks, sold_for: sold, cost, status },
-    fee,
+    feePct,
   };
 }
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     const order = { id: `GIFT-${Date.now().toString(36).toUpperCase()}`, added_at: new Date().toISOString(), ...p.fields };
     const { error } = await db().from("gift_orders").insert(order);
     if (error) throw new Error(error.message);
-    await setGiftExtra(order.id, p.fee ?? null);
+    await setGiftExtra(order.id, p.feePct ?? null);
     return NextResponse.json({ ok: true, order });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed", 500);
@@ -52,7 +52,7 @@ export async function PUT(req: Request) {
     const { data, error } = await db().from("gift_orders").update(p.fields).eq("id", id).select();
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return bad("Gift not found.", 404);
-    await setGiftExtra(id, p.fee ?? null);
+    await setGiftExtra(id, p.feePct ?? null);
     return NextResponse.json({ ok: true, order: data[0] });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed", 500);

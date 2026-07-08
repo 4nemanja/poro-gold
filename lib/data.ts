@@ -52,7 +52,7 @@ export function orderRecencySort(a: Order, b: Order): number {
 // Per-order fee / supplier-split annotations. The orders table schema can't be
 // altered from here, so these live in app_config keyed by order_id. `profit`
 // (a real column) already nets them out; these are for display + cost breakdown.
-export type OrderExtra = { fee?: number; supplier_share_pct?: number; supplier_cut?: number };
+export type OrderExtra = { fee_pct?: number; fee?: number; supplier_share_pct?: number; supplier_cut?: number };
 export type OrderExtras = Record<string, OrderExtra>;
 
 export async function getOrderExtras(): Promise<OrderExtras> {
@@ -61,7 +61,7 @@ export async function getOrderExtras(): Promise<OrderExtras> {
 
 export async function setOrderExtra(orderId: string, extra: OrderExtra | null): Promise<void> {
   const all = await getOrderExtras();
-  if (extra && (extra.fee || extra.supplier_share_pct || extra.supplier_cut)) all[orderId] = extra;
+  if (extra && (extra.fee_pct || extra.fee || extra.supplier_share_pct || extra.supplier_cut)) all[orderId] = extra;
   else delete all[orderId];
   await setConfig("order_extras", all);
 }
@@ -70,6 +70,7 @@ function mergeExtras(orders: Order[], extras: OrderExtras): Order[] {
   for (const o of orders) {
     const e = extras[o.order_id];
     if (e) {
+      o.fee_pct = e.fee_pct ?? null;
       o.fee = e.fee ?? null;
       o.supplier_share_pct = e.supplier_share_pct ?? null;
       o.supplier_cut = e.supplier_cut ?? null;
@@ -147,19 +148,20 @@ export type GiftOrder = {
   vbucks: number;
   sold_for: number | null;
   cost: number | null;
-  fee: number | null; // stored in app_config (gift_extras); schema can't be altered
+  fee_pct: number | null; // selling fee as a % of sold_for (stored in app_config)
   status: string; // in_progress | completed | refunded
   added_at?: string;
 };
 
 // Per-gift fee lives in app_config (the gift_orders table can't be altered here).
-export type GiftExtras = Record<string, { fee?: number }>;
+// Stored as a percent of the sale price.
+export type GiftExtras = Record<string, { fee_pct?: number }>;
 export async function getGiftExtras(): Promise<GiftExtras> {
   return getConfig<GiftExtras>("gift_extras", {});
 }
-export async function setGiftExtra(id: string, fee: number | null): Promise<void> {
+export async function setGiftExtra(id: string, feePct: number | null): Promise<void> {
   const all = await getGiftExtras();
-  if (fee) all[id] = { fee };
+  if (feePct) all[id] = { fee_pct: feePct };
   else delete all[id];
   await setConfig("gift_extras", all);
 }
@@ -183,7 +185,7 @@ export async function getGiftOrders(): Promise<GiftOrder[]> {
       vbucks: num(r.vbucks) ?? 0,
       sold_for: num(r.sold_for),
       cost: num(r.cost),
-      fee: extras[id]?.fee ?? null,
+      fee_pct: extras[id]?.fee_pct ?? null,
       status: (r.status as string) ?? "in_progress",
       added_at: (r.added_at as string) ?? undefined,
     };
@@ -198,16 +200,24 @@ export async function saveSuppliers(list: SupplierRecord[]): Promise<void> {
   await setConfig("suppliers", list);
 }
 
-// --- Per-platform withdrawal fees (editable %, keyed by workspace slug) ---
-export type WithdrawalFees = Record<string, number>;
-export async function getWithdrawalFees(): Promise<WithdrawalFees> {
-  return getConfig<WithdrawalFees>("withdrawal_fees", {});
+// --- Per-platform fees (editable %, keyed by workspace slug) ---
+// Two independent kinds: "withdrawal" (cashing out) and "selling" (marketplace
+// cut on each sale). Both live in app_config as slug -> percent maps.
+export type PlatformFees = Record<string, number>;
+export type FeeKind = "withdrawal" | "selling";
+const FEE_KEY: Record<FeeKind, string> = { withdrawal: "withdrawal_fees", selling: "selling_fees" };
+
+export async function getPlatformFees(kind: FeeKind): Promise<PlatformFees> {
+  return getConfig<PlatformFees>(FEE_KEY[kind], {});
 }
-export async function setWithdrawalFee(slug: string, pct: number): Promise<void> {
-  const all = await getWithdrawalFees();
+export async function setPlatformFee(kind: FeeKind, slug: string, pct: number): Promise<void> {
+  const all = await getPlatformFees(kind);
   all[slug] = pct;
-  await setConfig("withdrawal_fees", all);
+  await setConfig(FEE_KEY[kind], all);
 }
+// Back-compat aliases used by the withdrawal-fee UI.
+export const getWithdrawalFees = () => getPlatformFees("withdrawal");
+export const setWithdrawalFee = (slug: string, pct: number) => setPlatformFee("withdrawal", slug, pct);
 
 // --- Pure aggregation helpers ---
 export function sumRevenue(orders: Order[]): number {

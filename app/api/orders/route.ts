@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const VALID_STATUS = ["completed", "in_delivery", "refunded", "cancelled"];
 
 type Fields = Record<string, unknown>;
-type Extra = { fee?: number; supplier_share_pct?: number; supplier_cut?: number };
+type Extra = { fee_pct?: number; fee?: number; supplier_share_pct?: number; supplier_cut?: number };
 
 function parseFields(body: Record<string, unknown>): { ok: false; error: string } | { ok: true; fields: Fields; extra: Extra } {
   const ws = getWorkspace(String(body.workspace ?? ""));
@@ -26,18 +26,21 @@ function parseFields(body: Record<string, unknown>): { ok: false; error: string 
   const costRaw = body.cost;
   const cost = costRaw === "" || costRaw == null ? null : Number(costRaw);
   if (cost != null && Number.isNaN(cost)) return { ok: false, error: "Supplier cost must be a number." };
-  const feeRaw = body.fee;
-  const fee = feeRaw === "" || feeRaw == null ? null : Number(feeRaw);
-  if (fee != null && (Number.isNaN(fee) || fee < 0)) return { ok: false, error: "Fee must be a positive number." };
+  // Fee is entered as a PERCENT of the sale price.
+  const feeRaw = body.fee_pct;
+  const feePct = feeRaw === "" || feeRaw == null ? null : Number(feeRaw);
+  if (feePct != null && (Number.isNaN(feePct) || feePct < 0 || feePct > 100))
+    return { ok: false, error: "Fee % must be between 0 and 100." };
+  const feeAmount = feePct != null ? Math.round(soldFor * (feePct / 100) * 100) / 100 : null;
   const shareRaw = body.supplier_share_pct;
   const sharePct = shareRaw === "" || shareRaw == null ? null : Number(shareRaw);
   if (sharePct != null && (Number.isNaN(sharePct) || sharePct < 0 || sharePct > 100))
     return { ok: false, error: "Supplier profit share must be between 0 and 100." };
 
-  // Profit is net of fee and any supplier profit-split. It's the authoritative
-  // money figure and lives in the real `profit` column; fee/share/cut are kept
-  // as annotations (app_config) via `extra`.
-  const { supplierCut, profit } = computeOrderProfit(soldFor, cost, fee, sharePct);
+  // Profit is net of the fee and any supplier profit-split. It's the authoritative
+  // money figure and lives in the real `profit` column; fee %/amount/share/cut are
+  // kept as annotations (app_config) via `extra`.
+  const { supplierCut, profit } = computeOrderProfit(soldFor, cost, feeAmount, sharePct);
   return {
     ok: true,
     fields: {
@@ -47,13 +50,18 @@ function parseFields(body: Record<string, unknown>): { ok: false; error: string 
       supplier: String(body.supplier ?? "").trim() || null,
       cost,
       sold_for: soldFor,
-      profit: cost != null || fee != null ? profit : null,
+      profit: cost != null || feePct != null ? profit : null,
       status,
       method: String(body.method ?? "").trim() || null,
       currency: String(body.currency ?? "USD").trim().toUpperCase() || "USD",
       workspace: ws.slug,
     },
-    extra: { fee: fee ?? undefined, supplier_share_pct: sharePct ?? undefined, supplier_cut: supplierCut || undefined },
+    extra: {
+      fee_pct: feePct ?? undefined,
+      fee: feeAmount ?? undefined,
+      supplier_share_pct: sharePct ?? undefined,
+      supplier_cut: supplierCut || undefined,
+    },
   };
 }
 

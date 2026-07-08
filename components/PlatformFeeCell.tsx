@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, X } from "lucide-react";
 
-// Inline-editable withdrawal fee (%) for one platform. Click the pencil to edit,
-// type a new %, save. Persists to app_config via /api/withdrawal-fees.
-export function WithdrawalFeeCell({ slug, pct }: { slug: string; pct: number }) {
+// Inline-editable per-platform fee (%). `kind` is "withdrawal" or "selling".
+// Click the pencil to edit, type a new %, save. Persists via /api/platform-fees.
+export function PlatformFeeCell({ slug, pct, kind }: { slug: string; pct: number; kind: "withdrawal" | "selling" }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(pct));
@@ -17,10 +17,10 @@ export function WithdrawalFeeCell({ slug, pct }: { slug: string; pct: number }) 
     setSaving(true);
     setError(false);
     try {
-      const res = await fetch("/api/withdrawal-fees", {
+      const res = await fetch("/api/platform-fees", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: slug, pct: value === "" ? 0 : Number(value) }),
+        body: JSON.stringify({ workspace: slug, kind, pct: value === "" ? 0 : Number(value) }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error);
@@ -37,7 +37,7 @@ export function WithdrawalFeeCell({ slug, pct }: { slug: string; pct: number }) 
     return (
       <div className="flex items-center justify-end gap-2">
         <span className="font-mono text-zinc-700">{pct ? `${pct}%` : "—"}</span>
-        <button onClick={() => setEditing(true)} title="Edit withdrawal fee" className="text-zinc-400 hover:text-sky-600">
+        <button onClick={() => setEditing(true)} title={`Edit ${kind} fee`} className="text-zinc-400 hover:text-sky-600">
           <Pencil size={14} />
         </button>
       </div>

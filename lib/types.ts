@@ -28,7 +28,10 @@ export type Order = {
   // Fee (marketplace/payment) and supplier profit-split, stored in app_config
   // (order_extras) since the orders table schema can't be altered. `profit`
   // already reflects both; these are kept for display + the Costs breakdown.
-  fee?: number | null;
+  // The fee is entered as a PERCENT of the sale price; fee (the $ amount it works
+  // out to) is derived and stored for the Costs breakdown.
+  fee_pct?: number | null; // % of sold_for taken as the selling/marketplace fee
+  fee?: number | null; // $ amount = sold_for * fee_pct/100
   supplier_share_pct?: number | null; // % of gross profit the supplier takes
   supplier_cut?: number | null; // $ the supplier takes from gross profit
 };

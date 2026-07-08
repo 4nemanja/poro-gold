@@ -124,15 +124,15 @@ export function OrderModal({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Fee">
-                  <input name="fee" type="number" step="0.01" min="0" defaultValue={order?.fee ?? ""} placeholder="0.00" className={inputCls} />
+                <Field label="Fee %">
+                  <input name="fee_pct" type="number" step="0.01" min="0" max="100" defaultValue={order?.fee_pct ?? ""} placeholder="e.g. 10" className={inputCls} />
                 </Field>
                 <Field label="Supplier Profit Share %">
                   <input name="supplier_share_pct" type="number" step="1" min="0" max="100" defaultValue={order?.supplier_share_pct ?? ""} placeholder="e.g. 50" className={inputCls} />
                 </Field>
               </div>
               <p className="-mt-2 text-xs text-zinc-400">
-                Fee is subtracted from profit. Supplier share is the % of profit a splitting supplier keeps (leave blank for none).
+                Fee % is the marketplace cut of the sale price, subtracted from profit. Supplier share is the % of profit a splitting supplier keeps (leave blank for none).
               </p>
 
               {error && <p className="text-sm text-rose-600">{error}</p>}

@@ -90,8 +90,8 @@ export function GiftModal({ gift }: { gift?: GiftOrder }) {
                 <Field label="Cost ($)">
                   <input name="cost" type="number" step="0.01" min="0" defaultValue={gift?.cost ?? ""} placeholder="0.00" className={cls} />
                 </Field>
-                <Field label="Fee ($)">
-                  <input name="fee" type="number" step="0.01" min="0" defaultValue={gift?.fee ?? ""} placeholder="0.00" className={cls} />
+                <Field label="Fee %">
+                  <input name="fee_pct" type="number" step="0.01" min="0" max="100" defaultValue={gift?.fee_pct ?? ""} placeholder="e.g. 10" className={cls} />
                 </Field>
               </div>
               {error && <p className="text-sm text-rose-600">{error}</p>}
