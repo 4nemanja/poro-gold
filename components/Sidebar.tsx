@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Globe, Truck, Undo2, Wallet, Gift, Zap, LineChart } from "lucide-react";
+import { LayoutDashboard, Globe, Truck, Undo2, Wallet, Gift, Zap, LineChart, Bug } from "lucide-react";
 
 const NAV = [
   { icon: LayoutDashboard, label: "Main Dashboard", href: "/" },
@@ -12,6 +12,7 @@ const NAV = [
   { icon: Undo2, label: "Refunded", href: "/refunded" },
   { icon: Wallet, label: "Investment", href: "/investment" },
   { icon: Gift, label: "Gift System", href: "/gifts" },
+  { icon: Bug, label: "Bugs & Requests", href: "/bugs" },
 ];
 
 export function Sidebar() {

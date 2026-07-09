@@ -1,6 +1,6 @@
 import { db } from "./supabase";
 import { statusCategory } from "./orderStatus";
-import type { Order, SupplierRecord } from "./types";
+import type { Order, SupplierRecord, BugReport } from "./types";
 
 // A refunded or cancelled order earned no profit — never count it.
 function earnsProfit(o: Order): boolean {
@@ -205,6 +205,14 @@ export async function getSuppliers(): Promise<SupplierRecord[]> {
 }
 export async function saveSuppliers(list: SupplierRecord[]): Promise<void> {
   await setConfig("suppliers", list);
+}
+
+// --- Bug reports / feature requests (stored in app_config) ---
+export async function getBugs(): Promise<BugReport[]> {
+  return getConfig<BugReport[]>("bug_reports", []);
+}
+export async function saveBugs(list: BugReport[]): Promise<void> {
+  await setConfig("bug_reports", list);
 }
 
 // --- Per-platform fees (editable %, keyed by workspace slug) ---

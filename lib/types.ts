@@ -45,6 +45,20 @@ export type SupplierRecord = {
   share_pct: number; // default % of profit the supplier takes on SPLIT orders
 };
 
+// A bug report / feature request logged by a teammate. Stored in app_config.
+// An optional amount + unit lets them attach a $ or % to a financial issue.
+export type BugReport = {
+  id: string;
+  title: string;
+  description: string | null;
+  type: "bug" | "request"; // an actual bug, or something they want added
+  amount: number | null; // optional $ / % value tied to the issue
+  amount_unit: "$" | "%" | null;
+  reporter: string | null; // who logged it (from their login)
+  status: "open" | "resolved";
+  created_at: string;
+};
+
 export type Platform = {
   name: string;
   offers: string | null;
