@@ -1,6 +1,6 @@
-import { getInvestment, getInvestmentBatches, LEDGER_START } from "@/lib/data";
+import { getInvestment, getInvestmentBatches, sumProfit, LEDGER_START } from "@/lib/data";
 import { loadOrders } from "@/lib/ordersView";
-import { isCompleted } from "@/lib/orderStatus";
+import { isCompleted, statusCategory } from "@/lib/orderStatus";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
 import { InvestmentModal } from "@/components/InvestmentModal";
@@ -25,12 +25,19 @@ export default async function InvestmentPage() {
   const injected = batches.reduce((a, b) => a + b.amount, 0);
   const sortedBatches = [...batches].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
 
+  // A refunded/cancelled order made no profit.
+  const earned = (o: (typeof all)[number]) => {
+    const c = statusCategory(o.status);
+    return c === "refunded" || c === "cancelled" ? 0 : toUsd(o.profit, o.currency);
+  };
+
   const ledger = all
     .filter((o) => o.cost != null && (o.date ?? "") >= LEDGER_START)
     .map((o) => ({
       o,
       costUsd: toUsd(o.cost, o.currency),
       revUsd: isCompleted(o.status) ? toUsd(o.sold_for, o.currency) : 0,
+      profitUsd: earned(o),
     }))
     .sort((a, b) => (b.o.date ?? "").localeCompare(a.o.date ?? ""));
   const spent = ledger.reduce((a, l) => a + l.costUsd, 0);
@@ -64,6 +71,16 @@ export default async function InvestmentPage() {
   }
   const usage = Object.fromEntries(purse.map((p) => [p.id, { spent: p.spent, left: p.rem }]));
   const totalLeft = purse.reduce((a, p) => a + p.rem, 0);
+
+  // Profit made "by batch" = profit from every order while that batch was your
+  // working capital, i.e. from the day it was added until the next top-up.
+  const madeByBatch: Record<string, number> = {};
+  sortedBatches.forEach((b, i) => {
+    const start = b.date;
+    const end = sortedBatches[i + 1]?.date ?? "9999-12-31";
+    const inWindow = all.filter((o) => (o.date ?? "") >= start && (o.date ?? "") < end);
+    madeByBatch[b.id] = sumProfit(inWindow);
+  });
 
   return (
     <div className="space-y-6">
@@ -116,6 +133,7 @@ export default async function InvestmentPage() {
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Amount</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Spent</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Left</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Made</th>
                 <th className="pb-3 w-24">Used</th>
                 <th className="pb-3 w-20"></th>
               </tr>
@@ -134,6 +152,7 @@ export default async function InvestmentPage() {
                     <td className={`py-3.5 text-sm font-mono text-right ${u.left > 0 ? "text-emerald-600" : "text-zinc-400"}`}>
                       {formatCurrencyPrecise(u.left)}
                     </td>
+                    <td className="py-3.5 text-sm font-mono text-emerald-600 text-right">{formatCurrencyPrecise(madeByBatch[b.id] ?? 0)}</td>
                     <td className="py-3.5">
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 flex-1 rounded-full bg-zinc-100 overflow-hidden">
@@ -169,10 +188,11 @@ export default async function InvestmentPage() {
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Supplier</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Cost Out</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Collected</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Profit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
-              {ledger.slice(0, 100).map(({ o, costUsd, revUsd }) => (
+              {ledger.slice(0, 100).map(({ o, costUsd, revUsd, profitUsd }) => (
                 <tr key={o.order_id} className="hover:bg-zinc-50 transition-colors">
                   <td className="py-3 text-sm text-zinc-500">{o.date ?? "—"}</td>
                   <td className="py-3 text-sm">
@@ -182,6 +202,9 @@ export default async function InvestmentPage() {
                   <td className="py-3 text-sm text-zinc-500">{o.supplier ?? "—"}</td>
                   <td className="py-3 text-sm font-mono text-rose-600 text-right">{costUsd ? `-${formatCurrencyPrecise(costUsd)}` : "—"}</td>
                   <td className="py-3 text-sm font-mono text-emerald-600 text-right">{revUsd ? `+${formatCurrencyPrecise(revUsd)}` : "—"}</td>
+                  <td className={`py-3 text-sm font-mono text-right ${profitUsd > 0 ? "text-emerald-600" : profitUsd < 0 ? "text-rose-600" : "text-zinc-400"}`}>
+                    {profitUsd ? formatCurrencyPrecise(profitUsd) : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
