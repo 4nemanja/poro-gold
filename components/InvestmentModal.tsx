@@ -36,25 +36,17 @@ export function InvestmentModal({ investment }: { investment: Investment }) {
   return (
     <>
       <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-sm text-sky-600 hover:underline">
-        <Pencil size={14} /> Edit
+        <Pencil size={14} /> Rate
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md bg-white rounded-xl shadow-xl border border-zinc-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200">
-              <h3 className="text-sm font-semibold text-zinc-900">Edit Investment</h3>
+              <h3 className="text-sm font-semibold text-zinc-900">Exchange Rate</h3>
               <button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
             <form onSubmit={submit} className="p-5 space-y-4">
-              <label className="flex flex-col gap-1 text-xs font-medium text-zinc-500">
-                Total Invested (USD)
-                <input name="invested_usd" type="number" step="0.01" min="0" defaultValue={investment.invested_usd} className={cls} required />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-zinc-500">
-                Note (e.g. original amount)
-                <input name="note" defaultValue={investment.note} placeholder="500 EUR" className={cls} />
-              </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-zinc-500">
                 RSD per USD (for KupujemProdajem conversion)
                 <input name="rsd_per_usd" type="number" step="0.01" min="0" defaultValue={investment.rsd_per_usd} className={cls} />

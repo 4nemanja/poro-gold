@@ -146,6 +146,17 @@ export async function getInvestment(): Promise<Investment> {
   return getConfig<Investment>("investment", { invested_usd: 0, note: "", rsd_per_usd: 117 });
 }
 
+// Capital is injected in batches (e.g. $500 at a time). It's revolving working
+// capital — a batch churns through many sales, so total injected is the sum of
+// batches, and current capital = injected - supplier spend + revenue collected.
+export type InvestmentBatch = { id: string; date: string; amount: number; note: string };
+export async function getInvestmentBatches(): Promise<InvestmentBatch[]> {
+  return getConfig<InvestmentBatch[]>("investment_batches", []);
+}
+export async function saveInvestmentBatches(list: InvestmentBatch[]): Promise<void> {
+  await setConfig("investment_batches", list);
+}
+
 // --- Gift System ---
 export type GiftConfig = { invested_usd: number; vbucks_stock: number; note: string };
 export type GiftOrder = {
