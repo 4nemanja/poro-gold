@@ -42,6 +42,29 @@ export default async function InvestmentPage() {
   const profit = collected - spent;
   const multiple = injected > 0 ? currentCapital / injected : 0;
 
+  // Per-batch usage: allocate each supplier payment to the oldest batch that
+  // already existed on that date (FIFO). "Spent" = injection used to buy stock;
+  // "Left" = still unspent. (Collected revenue is a pool-level return, not added
+  // back to a specific batch — that's what Current Capital reflects.)
+  const purse = sortedBatches.map((b) => ({ id: b.id, date: b.date, rem: b.amount, spent: 0 }));
+  const spendTxns = ledger
+    .filter((l) => l.costUsd > 0)
+    .map((l) => ({ date: l.o.date ?? "", amount: l.costUsd }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  for (const t of spendTxns) {
+    let amt = t.amount;
+    for (const p of purse) {
+      if (amt <= 0) break;
+      if (p.date > t.date || p.rem <= 0) continue; // batch not available / empty
+      const take = Math.min(p.rem, amt);
+      p.rem -= take;
+      p.spent += take;
+      amt -= take;
+    }
+  }
+  const usage = Object.fromEntries(purse.map((p) => [p.id, { spent: p.spent, left: p.rem }]));
+  const totalLeft = purse.reduce((a, p) => a + p.rem, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -79,7 +102,7 @@ export default async function InvestmentPage() {
 
       <Card
         title="Capital Batches"
-        action={<span className="text-xs text-zinc-400">{batches.length} batches · {formatCurrencyPrecise(injected)} total</span>}
+        action={<span className="text-xs text-zinc-400">{formatCurrencyPrecise(totalLeft)} left of {formatCurrencyPrecise(injected)} injected</span>}
       >
         {batches.length === 0 ? (
           <p className="text-sm text-zinc-500">No batches yet. Use Add Batch each time you put money in (e.g. a $500 top-up).</p>
@@ -91,24 +114,43 @@ export default async function InvestmentPage() {
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Date Added</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Note</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Amount</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Spent</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Left</th>
+                <th className="pb-3 w-24">Used</th>
                 <th className="pb-3 w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
-              {sortedBatches.map((b, i) => (
-                <tr key={b.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="py-3.5 text-sm text-zinc-400">{i + 1}</td>
-                  <td className="py-3.5 text-sm text-zinc-700">{b.date}</td>
-                  <td className="py-3.5 text-sm text-zinc-500">{b.note || "—"}</td>
-                  <td className="py-3.5 text-sm font-mono text-zinc-900 text-right">{formatCurrencyPrecise(b.amount)}</td>
-                  <td className="py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <InvestmentBatchModal batch={b} />
-                      <DeleteBatchButton id={b.id} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {sortedBatches.map((b, i) => {
+                const u = usage[b.id] ?? { spent: 0, left: b.amount };
+                const pct = b.amount > 0 ? Math.min(100, Math.round((u.spent / b.amount) * 100)) : 0;
+                return (
+                  <tr key={b.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="py-3.5 text-sm text-zinc-400">{i + 1}</td>
+                    <td className="py-3.5 text-sm text-zinc-700">{b.date}</td>
+                    <td className="py-3.5 text-sm text-zinc-500">{b.note || "—"}</td>
+                    <td className="py-3.5 text-sm font-mono text-zinc-900 text-right">{formatCurrencyPrecise(b.amount)}</td>
+                    <td className="py-3.5 text-sm font-mono text-rose-600 text-right">{formatCurrencyPrecise(u.spent)}</td>
+                    <td className={`py-3.5 text-sm font-mono text-right ${u.left > 0 ? "text-emerald-600" : "text-zinc-400"}`}>
+                      {formatCurrencyPrecise(u.left)}
+                    </td>
+                    <td className="py-3.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 rounded-full bg-zinc-100 overflow-hidden">
+                          <div className={`h-full ${pct >= 100 ? "bg-rose-500" : "bg-sky-500"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs text-zinc-400 w-8 text-right">{pct}%</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <InvestmentBatchModal batch={b} />
+                        <DeleteBatchButton id={b.id} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
