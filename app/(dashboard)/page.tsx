@@ -1,4 +1,4 @@
-import { sumRevenue, sumProfit } from "@/lib/data";
+import { sumRevenue, sumProfit, sumCost } from "@/lib/data";
 import { loadOrders, resolvePeriod, inRange, makeStatusMatch, addDateFor, type ViewParams } from "@/lib/ordersView";
 import { isCompleted, isInProgress } from "@/lib/orderStatus";
 import { getWorkspace } from "@/lib/workspaces";
@@ -33,6 +33,7 @@ export default async function MainDashboard({
   const inProgress = visible.filter((o) => isInProgress(o.status));
   const revenue = sumRevenue(visible);
   const profit = sumProfit(visible);
+  const spent = sumCost(visible);
 
   return (
     <div className="space-y-6">
@@ -52,11 +53,12 @@ export default async function MainDashboard({
 
       <StatusFilter />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Orders" value={formatNum(visible.length)} icon={<ClipboardList size={18} />} />
         <StatCard label="In Progress" value={formatNum(inProgress.length)} icon={<Clock size={18} />} iconClass="bg-amber-50 text-amber-600" />
         <StatCard label="Completed" value={formatNum(completed.length)} icon={<CheckCircle2 size={18} />} iconClass="bg-emerald-50 text-emerald-600" />
         <StatCard label="Revenue" value={formatCurrencyPrecise(revenue)} icon={<DollarSign size={18} />} iconClass="bg-sky-50 text-sky-600" />
+        <StatCard label="Spent on Suppliers" value={formatCurrencyPrecise(spent)} icon={<DollarSign size={18} />} iconClass="bg-rose-50 text-rose-600" />
         <StatCard label="Profit" value={formatCurrencyPrecise(profit)} icon={<DollarSign size={18} />} iconClass="bg-emerald-50 text-emerald-600" />
       </div>
 

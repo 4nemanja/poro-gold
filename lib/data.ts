@@ -59,7 +59,13 @@ export function orderRecencySort(a: Order, b: Order): number {
 // Per-order fee / supplier-split annotations. The orders table schema can't be
 // altered from here, so these live in app_config keyed by order_id. `profit`
 // (a real column) already nets them out; these are for display + cost breakdown.
-export type OrderExtra = { fee_pct?: number; fee?: number; supplier_share_pct?: number; supplier_cut?: number };
+export type OrderExtra = {
+  fee_pct?: number;
+  fee?: number;
+  withdrawal_fee?: number;
+  supplier_share_pct?: number;
+  supplier_cut?: number;
+};
 export type OrderExtras = Record<string, OrderExtra>;
 
 export async function getOrderExtras(): Promise<OrderExtras> {
@@ -68,7 +74,8 @@ export async function getOrderExtras(): Promise<OrderExtras> {
 
 export async function setOrderExtra(orderId: string, extra: OrderExtra | null): Promise<void> {
   const all = await getOrderExtras();
-  if (extra && (extra.fee_pct || extra.fee || extra.supplier_share_pct || extra.supplier_cut)) all[orderId] = extra;
+  if (extra && (extra.fee_pct || extra.fee || extra.withdrawal_fee || extra.supplier_share_pct || extra.supplier_cut))
+    all[orderId] = extra;
   else delete all[orderId];
   await setConfig("order_extras", all);
 }
@@ -79,6 +86,7 @@ function mergeExtras(orders: Order[], extras: OrderExtras): Order[] {
     if (e) {
       o.fee_pct = e.fee_pct ?? null;
       o.fee = e.fee ?? null;
+      o.withdrawal_fee = e.withdrawal_fee ?? null;
       o.supplier_share_pct = e.supplier_share_pct ?? null;
       o.supplier_cut = e.supplier_cut ?? null;
     }
@@ -262,16 +270,19 @@ export function sumSupplierCuts(orders: Order[]): number {
   return orders.reduce((acc, o) => acc + (o.supplier_cut ?? 0), 0);
 }
 
-// Net profit math for a single order, given a fee and the supplier's share % of
-// the gross profit. Returns the fee-adjusted gross, the supplier's cut, and your
-// net profit. Supplier only shares in a positive gross (never covers a loss).
+// Net profit math for a single order. BOTH fees come off before any supplier
+// split: the marketplace selling fee and the platform's withdrawal fee (what it
+// costs to get the money off that platform). A splitting supplier takes their %
+// of what's left, so the withdrawal fee is shared, not absorbed by you alone.
+// Supplier only shares in a positive gross (never covers a loss).
 export function computeOrderProfit(
   soldFor: number,
   cost: number | null,
   fee: number | null,
+  withdrawalFee: number | null,
   sharePct: number | null,
 ): { gross: number; supplierCut: number; profit: number } {
-  const gross = Math.round((soldFor - (cost ?? 0) - (fee ?? 0)) * 100) / 100;
+  const gross = Math.round((soldFor - (cost ?? 0) - (fee ?? 0) - (withdrawalFee ?? 0)) * 100) / 100;
   const pct = sharePct && sharePct > 0 ? Math.min(sharePct, 100) : 0;
   const supplierCut = gross > 0 && pct > 0 ? Math.round(gross * (pct / 100) * 100) / 100 : 0;
   const profit = Math.round((gross - supplierCut) * 100) / 100;

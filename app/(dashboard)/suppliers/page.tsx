@@ -20,14 +20,15 @@ export default async function SuppliersPage({
   const [{ all }, managed] = await Promise.all([loadOrders(), getSuppliers()]);
 
   const visible = all.filter((o) => inRange(o, from, to) && statusMatch(o));
-  const map = new Map<string, { orders: number; cost: number; revenue: number; supplierCut: number }>();
+  const map = new Map<string, { orders: number; cost: number; revenue: number; supplierCut: number; withdrawal: number }>();
   for (const o of visible) {
     if (!o.supplier) continue;
-    const s = map.get(o.supplier) ?? { orders: 0, cost: 0, revenue: 0, supplierCut: 0 };
+    const s = map.get(o.supplier) ?? { orders: 0, cost: 0, revenue: 0, supplierCut: 0, withdrawal: 0 };
     s.orders += 1;
     s.cost += o.cost ?? 0;
     s.revenue += o.sold_for ?? 0;
     s.supplierCut += o.supplier_cut ?? 0;
+    s.withdrawal += o.withdrawal_fee ?? 0;
     map.set(o.supplier, s);
   }
   const suppliers = [...map.entries()]
@@ -98,6 +99,7 @@ export default async function SuppliersPage({
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Orders</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Total Cost</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Revenue</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Withdrawal Fee</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Profit Share Taken</th>
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Margin</th>
               </tr>
@@ -109,6 +111,7 @@ export default async function SuppliersPage({
                   <td className="py-4 text-sm font-mono text-zinc-700 text-right">{formatNum(s.orders)}</td>
                   <td className="py-4 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(s.cost)}</td>
                   <td className="py-4 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(s.revenue)}</td>
+                  <td className="py-4 text-sm font-mono text-rose-600 text-right">{s.withdrawal ? formatCurrencyPrecise(s.withdrawal) : "—"}</td>
                   <td className="py-4 text-sm font-mono text-violet-600 text-right">{s.supplierCut ? formatCurrencyPrecise(s.supplierCut) : "—"}</td>
                   <td className="py-4 text-sm font-mono text-emerald-600 text-right">{formatCurrencyPrecise(s.margin)}</td>
                 </tr>

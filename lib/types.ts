@@ -32,6 +32,7 @@ export type Order = {
   // out to) is derived and stored for the Costs breakdown.
   fee_pct?: number | null; // % of sold_for taken as the selling/marketplace fee
   fee?: number | null; // $ amount = sold_for * fee_pct/100
+  withdrawal_fee?: number | null; // $ cost of cashing out, off the platform's %
   supplier_share_pct?: number | null; // % of gross profit the supplier takes
   supplier_cut?: number | null; // $ the supplier takes from gross profit
 };

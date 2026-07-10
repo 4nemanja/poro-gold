@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
 import { getWorkspace } from "@/lib/workspaces";
-import { computeOrderProfit, setOrderExtra } from "@/lib/data";
+import { computeOrderProfit, setOrderExtra, getPlatformFees } from "@/lib/data";
 
 // Manually-added orders live in the shared `orders` table with source='manual'.
 // Only manual rows can be edited/deleted (API/Excel rows are read-only).
@@ -10,9 +10,15 @@ export const dynamic = "force-dynamic";
 const VALID_STATUS = ["completed", "in_delivery", "refunded", "cancelled"];
 
 type Fields = Record<string, unknown>;
-type Extra = { fee_pct?: number; fee?: number; supplier_share_pct?: number; supplier_cut?: number };
+type Extra = {
+  fee_pct?: number;
+  fee?: number;
+  withdrawal_fee?: number;
+  supplier_share_pct?: number;
+  supplier_cut?: number;
+};
 
-function parseFields(body: Record<string, unknown>): { ok: false; error: string } | { ok: true; fields: Fields; extra: Extra } {
+async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; error: string } | { ok: true; fields: Fields; extra: Extra }> {
   const ws = getWorkspace(String(body.workspace ?? ""));
   if (!ws) return { ok: false, error: "Pick a valid website." };
   const product = String(body.product ?? "").trim();
@@ -37,10 +43,15 @@ function parseFields(body: Record<string, unknown>): { ok: false; error: string 
   if (sharePct != null && (Number.isNaN(sharePct) || sharePct < 0 || sharePct > 100))
     return { ok: false, error: "Supplier profit share must be between 0 and 100." };
 
-  // Profit is net of the fee and any supplier profit-split. It's the authoritative
+  // The platform's withdrawal fee (what it costs to cash out) is a real cost and
+  // comes off BEFORE any supplier profit-split, so a splitting supplier shares it.
+  const wdPct = (await getPlatformFees("withdrawal"))[ws.slug] ?? 0;
+  const withdrawalAmount = wdPct > 0 ? Math.round(soldFor * (wdPct / 100) * 100) / 100 : 0;
+
+  // Profit is net of both fees and any supplier profit-split. It's the authoritative
   // money figure and lives in the real `profit` column; fee %/amount/share/cut are
   // kept as annotations (app_config) via `extra`.
-  const { supplierCut, profit } = computeOrderProfit(soldFor, cost, feeAmount, sharePct);
+  const { supplierCut, profit } = computeOrderProfit(soldFor, cost, feeAmount, withdrawalAmount, sharePct);
   return {
     ok: true,
     fields: {
@@ -50,7 +61,7 @@ function parseFields(body: Record<string, unknown>): { ok: false; error: string 
       supplier: String(body.supplier ?? "").trim() || null,
       cost,
       sold_for: soldFor,
-      profit: cost != null || feePct != null ? profit : null,
+      profit: cost != null || feePct != null || withdrawalAmount > 0 ? profit : null,
       status,
       method: String(body.method ?? "").trim() || null,
       currency: String(body.currency ?? "USD").trim().toUpperCase() || "USD",
@@ -59,10 +70,26 @@ function parseFields(body: Record<string, unknown>): { ok: false; error: string 
     extra: {
       fee_pct: feePct ?? undefined,
       fee: feeAmount ?? undefined,
+      withdrawal_fee: withdrawalAmount || undefined,
       supplier_share_pct: sharePct ?? undefined,
       supplier_cut: supplierCut || undefined,
     },
   };
+}
+
+// Bug #1: let a PlayerOK (or any) order be identified by the buyer's name instead
+// of a random MAN-xxxx id. Sanitize, then make it unique so two orders from the
+// same buyer don't collide on the primary key.
+async function uniqueOrderId(raw: string): Promise<string> {
+  const base = raw.trim().replace(/\s+/g, " ").slice(0, 60);
+  const { data } = await db().from("orders").select("order_id").ilike("order_id", `${base}%`);
+  const taken = new Set((data ?? []).map((r) => String(r.order_id).toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; i < 500; i++) {
+    const candidate = `${base}-${i}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+  return `${base}-${Date.now().toString(36).toUpperCase()}`;
 }
 
 function bad(error: string, status = 400) {
@@ -71,10 +98,14 @@ function bad(error: string, status = 400) {
 
 export async function POST(req: Request) {
   try {
-    const parsed = parseFields(await req.json());
+    const body = await req.json();
+    const parsed = await parseFields(body);
     if (!parsed.ok) return bad(parsed.error);
+    // Use the buyer's name as the order id when given, otherwise a random one.
+    const custom = String(body.custom_id ?? "").trim();
+    const orderId = custom ? await uniqueOrderId(custom) : `MAN-${Date.now().toString(36).toUpperCase()}`;
     const order = {
-      order_id: `MAN-${Date.now().toString(36).toUpperCase()}`,
+      order_id: orderId,
       supplier_paid: null,
       notes: null,
       source: "manual",
@@ -95,7 +126,7 @@ export async function PUT(req: Request) {
     const body = await req.json();
     const id = String(body.order_id ?? "");
     if (!id) return bad("Missing order id.");
-    const parsed = parseFields(body);
+    const parsed = await parseFields(body);
     if (!parsed.ok) return bad(parsed.error);
     // Any order can be edited (e.g. adding supplier cost to a GameBoost order).
     // The GameBoost sync omits cost/supplier/profit, so those edits survive a refresh.

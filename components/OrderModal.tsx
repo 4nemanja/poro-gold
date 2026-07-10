@@ -101,6 +101,12 @@ export function OrderModal({
                 <input name="product" defaultValue={order?.product ?? ""} placeholder="e.g. 2,800 V-Bucks" className={inputCls} required />
               </Field>
 
+              {!isEdit && (
+                <Field label="Buyer Name / Order ID (optional)">
+                  <input name="custom_id" placeholder="e.g. Mimileri — leave blank to auto-generate" className={inputCls} />
+                </Field>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Supplier Name">
                   <input name="supplier" defaultValue={order?.supplier ?? ""} placeholder="e.g. FFIN" className={inputCls} />
@@ -132,7 +138,8 @@ export function OrderModal({
                 </Field>
               </div>
               <p className="-mt-2 text-xs text-zinc-400">
-                Fee % is the marketplace cut of the sale price, subtracted from profit. Supplier share is the % of profit a splitting supplier keeps (leave blank for none).
+                Fee % is the marketplace cut of the sale price. The platform&apos;s withdrawal fee is applied automatically.
+                Both come off before the supplier share — the % of what&apos;s left that a splitting supplier keeps (blank for none).
               </p>
 
               {error && <p className="text-sm text-rose-600">{error}</p>}
