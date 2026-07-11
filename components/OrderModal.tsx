@@ -27,6 +27,7 @@ export function OrderModal({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGift, setIsGift] = useState(!!order?.is_gift);
 
   const isEdit = !!order;
   const today = new Date().toISOString().slice(0, 10);
@@ -141,6 +142,24 @@ export function OrderModal({
                 Fee % is the marketplace cut of the sale price. The platform&apos;s withdrawal fee is applied automatically.
                 Both come off before the supplier share — the % of what&apos;s left that a splitting supplier keeps (blank for none).
               </p>
+
+              <div className="rounded-lg border border-zinc-200 p-3 space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="is_gift"
+                    checked={isGift}
+                    onChange={(e) => setIsGift(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300"
+                  />
+                  Gift Order — also show &amp; track this in the Gift System
+                </label>
+                {isGift && (
+                  <Field label="V-Bucks Amount">
+                    <input name="vbucks" type="number" step="1" min="0" defaultValue={order?.vbucks ?? ""} placeholder="e.g. 2400" className={inputCls} />
+                  </Field>
+                )}
+              </div>
 
               {error && <p className="text-sm text-rose-600">{error}</p>}
 

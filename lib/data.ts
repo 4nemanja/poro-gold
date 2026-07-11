@@ -65,6 +65,8 @@ export type OrderExtra = {
   withdrawal_fee?: number;
   supplier_share_pct?: number;
   supplier_cut?: number;
+  is_gift?: boolean;
+  vbucks?: number;
 };
 export type OrderExtras = Record<string, OrderExtra>;
 
@@ -74,7 +76,11 @@ export async function getOrderExtras(): Promise<OrderExtras> {
 
 export async function setOrderExtra(orderId: string, extra: OrderExtra | null): Promise<void> {
   const all = await getOrderExtras();
-  if (extra && (extra.fee_pct || extra.fee || extra.withdrawal_fee || extra.supplier_share_pct || extra.supplier_cut))
+  if (
+    extra &&
+    (extra.fee_pct || extra.fee || extra.withdrawal_fee || extra.supplier_share_pct || extra.supplier_cut ||
+      extra.is_gift || extra.vbucks)
+  )
     all[orderId] = extra;
   else delete all[orderId];
   await setConfig("order_extras", all);
@@ -89,6 +95,8 @@ function mergeExtras(orders: Order[], extras: OrderExtras): Order[] {
       o.withdrawal_fee = e.withdrawal_fee ?? null;
       o.supplier_share_pct = e.supplier_share_pct ?? null;
       o.supplier_cut = e.supplier_cut ?? null;
+      o.is_gift = e.is_gift ?? null;
+      o.vbucks = e.vbucks ?? null;
     }
   }
   return orders;
@@ -101,6 +109,13 @@ export async function getAllOrders(): Promise<Order[]> {
   ]);
   if (error) throw new Error(`orders query failed: ${error.message}`);
   return mergeExtras((data ?? []).map(rowToOrder), extras).sort(orderRecencySort);
+}
+
+// Orders flagged as gifts (they also live on the Main Dashboard). Used by the
+// Gift System so gift orders aren't entered or tracked twice.
+export async function getGiftFlaggedOrders(): Promise<Order[]> {
+  const all = await getAllOrders();
+  return all.filter((o) => o.is_gift);
 }
 
 export async function getWorkspaceOrders(workspace: string): Promise<Order[]> {

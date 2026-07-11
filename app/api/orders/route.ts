@@ -16,7 +16,14 @@ type Extra = {
   withdrawal_fee?: number;
   supplier_share_pct?: number;
   supplier_cut?: number;
+  is_gift?: boolean;
+  vbucks?: number;
 };
+
+// Checkbox/boolean values arrive as "on"/"true"/true depending on the client.
+function truthy(v: unknown): boolean {
+  return v === true || v === "true" || v === "on" || v === "1";
+}
 
 async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; error: string } | { ok: true; fields: Fields; extra: Extra }> {
   const ws = getWorkspace(String(body.workspace ?? ""));
@@ -73,6 +80,8 @@ async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; 
       withdrawal_fee: withdrawalAmount || undefined,
       supplier_share_pct: sharePct ?? undefined,
       supplier_cut: supplierCut || undefined,
+      is_gift: truthy(body.is_gift) || undefined,
+      vbucks: truthy(body.is_gift) && Number(body.vbucks) > 0 ? Number(body.vbucks) : undefined,
     },
   };
 }
