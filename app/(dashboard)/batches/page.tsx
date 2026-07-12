@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getInvestmentBatches } from "@/lib/data";
 import { loadOrders } from "@/lib/ordersView";
 import { analyzeBatches, type BatchAnalysis, type Ranked } from "@/lib/batches";
@@ -51,10 +52,10 @@ export default async function BatchAnalysisPage({
         <BatchSelector options={options} />
       </div>
 
-      {/* Compare all batches side by side */}
-      <Card title="All Batches" action={<span className="text-xs text-zinc-400">profit made per batch</span>}>
+      {/* Compare all batches side by side — click a row to open its analysis */}
+      <Card title="All Batches" action={<span className="text-xs text-zinc-400">click a batch to analyse it</span>}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[720px]">
+          <table className="w-full text-left border-collapse min-w-[760px]">
             <thead>
               <tr className="border-b border-zinc-200">
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Batch</th>
@@ -68,24 +69,32 @@ export default async function BatchAnalysisPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
-              {analyses.map((a, i) => (
-                <tr key={a.batch.id} className={`hover:bg-zinc-50 transition-colors ${a.batch.id === selected.batch.id ? "bg-sky-50/40" : ""}`}>
-                  <td className="py-3 text-sm font-medium text-zinc-900">Batch {i + 1} · {a.batch.date}</td>
-                  <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(a.injected)}</td>
-                  <td className="py-3 text-sm font-mono text-zinc-500 text-right">{pct(a.pctUsed)}</td>
-                  <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatNum(a.orderCount)}</td>
-                  <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(a.revenue)}</td>
-                  <td className="py-3 text-sm font-mono text-emerald-600 text-right">{formatCurrencyPrecise(a.profit)}</td>
-                  <td className="py-3 text-sm font-mono text-zinc-700 text-right">{pct(a.marginPct)}</td>
-                  <td className="py-3 text-sm">
-                    {a.complete ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700"><CheckCircle2 size={12} /> Complete</span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700"><Clock size={12} /> {pct(a.pctUsed)} used</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {analyses.map((a, i) => {
+                const on = a.batch.id === selected.batch.id;
+                return (
+                  <tr key={a.batch.id} className={`group cursor-pointer transition-colors ${on ? "bg-sky-50/50" : "hover:bg-zinc-50"}`}>
+                    <td className="py-3.5 text-sm font-medium text-zinc-900">
+                      <Link href={`/batches?batch=${a.batch.id}`} className="flex items-center gap-2 group-hover:text-sky-600">
+                        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${on ? "bg-sky-600 text-white" : "bg-zinc-100 text-zinc-600"}`}>{i + 1}</span>
+                        {a.batch.date}
+                      </Link>
+                    </td>
+                    <td className="py-3.5 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(a.injected)}</td>
+                    <td className="py-3.5 text-sm font-mono text-zinc-500 text-right">{pct(a.pctUsed)}</td>
+                    <td className="py-3.5 text-sm font-mono text-zinc-700 text-right">{formatNum(a.orderCount)}</td>
+                    <td className="py-3.5 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(a.revenue)}</td>
+                    <td className="py-3.5 text-sm font-mono font-semibold text-emerald-600 text-right">{formatCurrencyPrecise(a.profit)}</td>
+                    <td className="py-3.5 text-sm font-mono text-zinc-700 text-right">{pct(a.marginPct)}</td>
+                    <td className="py-3.5 text-sm">
+                      {a.complete ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700"><CheckCircle2 size={12} /> Complete</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700"><Clock size={12} /> {pct(a.pctUsed)} used</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

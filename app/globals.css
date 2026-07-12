@@ -18,6 +18,24 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   Readable tables across the whole dashboard. Cells only had vertical padding,
+   so numeric columns bunched together. Give every cell horizontal breathing
+   room (first/last stay flush with the card edge) and keep headers on one line.
+--------------------------------------------------------------------------- */
+main table { width: 100%; }
+main table th,
+main table td { padding-left: 1.5rem; vertical-align: middle; }
+main table th:first-child,
+main table td:first-child { padding-left: 0; }
+main table th:last-child,
+main table td:last-child { padding-right: 0; }
+main thead th { letter-spacing: 0.04em; white-space: nowrap; }
+/* Numeric / short columns shouldn't wrap; long text columns still can. */
+main table td.text-right,
+main table th.text-right { white-space: nowrap; }
+main tbody tr { transition: background-color 0.12s ease; }
+
+/* ---------------------------------------------------------------------------
    Dark mode. The app is built on a fixed zinc/tint palette with no `dark:`
    variants, so we remap those utility classes when <html> has `.dark`. These
    rules are unlayered, so they win over Tailwind's layered utilities.
