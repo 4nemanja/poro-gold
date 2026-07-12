@@ -137,7 +137,7 @@ export default async function GiftSystemPage({
               {visible.map((r) => (
                 <tr key={r.key} className="hover:bg-zinc-50 transition-colors">
                   <td className="py-3.5 text-sm text-zinc-500">{r.date || "—"}</td>
-                  <td className="py-3.5 text-sm text-zinc-700 max-w-xs truncate">{r.ref}</td>
+                  <td className="py-3.5 text-sm text-zinc-700">{r.ref}</td>
                   <td className="py-3.5 text-sm font-mono text-zinc-700 text-right">{r.vbucks ? formatNum(r.vbucks) : "—"}</td>
                   <td className="py-3.5 text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusBadgeClass(r.rawStatus)}`}>

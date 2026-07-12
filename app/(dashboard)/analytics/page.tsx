@@ -110,7 +110,7 @@ export default async function AnalyticsPage() {
 function BreakdownTable({ rows, firstCol }: { rows: { label: string; orders: Order[] }[]; firstCol: string }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse min-w-[640px]">
+      <table className="w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-zinc-200">
             <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">{firstCol}</th>

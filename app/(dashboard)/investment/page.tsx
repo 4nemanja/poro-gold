@@ -198,7 +198,7 @@ export default async function InvestmentPage() {
                   <td className="py-3 text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${platformBadgeClass(o.platform)}`}>{o.platform ?? "—"}</span>
                   </td>
-                  <td className="py-3 text-sm text-zinc-700 max-w-xs truncate">{o.product ?? "—"}</td>
+                  <td className="py-3 text-sm text-zinc-700">{o.product ?? "—"}</td>
                   <td className="py-3 text-sm text-zinc-500">{o.supplier ?? "—"}</td>
                   <td className="py-3 text-sm font-mono text-rose-600 text-right">{costUsd ? `-${formatCurrencyPrecise(costUsd)}` : "—"}</td>
                   <td className="py-3 text-sm font-mono text-emerald-600 text-right">{revUsd ? `+${formatCurrencyPrecise(revUsd)}` : "—"}</td>

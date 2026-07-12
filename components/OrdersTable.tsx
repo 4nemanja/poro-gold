@@ -24,7 +24,7 @@ export function OrdersTable({
 }) {
   return (
     <div className="overflow-x-auto">
-    <table className="w-full text-left border-collapse min-w-[900px]">
+    <table className="w-full text-left border-collapse">
       <thead>
         <tr className="border-b border-zinc-200">
           <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Order</th>
@@ -50,7 +50,7 @@ export function OrdersTable({
                 {o.platform ?? "—"}
               </span>
             </td>
-            <td className="py-3.5 text-sm text-zinc-700 max-w-xs truncate">{o.product ?? "—"}</td>
+            <td className="py-3.5 text-sm text-zinc-700">{o.product ?? "—"}</td>
             <td className="py-3.5 text-sm text-zinc-500">{o.supplier ?? "—"}</td>
             <td className="py-3.5 text-sm">
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusBadgeClass(o.status)}`}>

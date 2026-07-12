@@ -55,7 +55,7 @@ export default async function BatchAnalysisPage({
       {/* Compare all batches side by side — click a row to open its analysis */}
       <Card title="All Batches" action={<span className="text-xs text-zinc-400">click a batch to analyse it</span>}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[760px]">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-zinc-200">
                 <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Batch</th>
@@ -149,7 +149,7 @@ function BatchDetail({ a }: { a: BatchAnalysis }) {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <Card title="By Product">
           <BreakdownTable rows={a.byProduct} firstCol="Product" />
         </Card>
@@ -185,7 +185,7 @@ function BreakdownTable({ rows, firstCol }: { rows: Ranked[]; firstCol: string }
   if (rows.length === 0) return <p className="text-sm text-zinc-500">No {firstCol.toLowerCase()} data for this batch.</p>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse min-w-[420px]">
+      <table className="w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-zinc-200">
             <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">{firstCol}</th>
@@ -198,7 +198,7 @@ function BreakdownTable({ rows, firstCol }: { rows: Ranked[]; firstCol: string }
         <tbody className="divide-y divide-zinc-200">
           {rows.map((r) => (
             <tr key={r.name} className="hover:bg-zinc-50 transition-colors">
-              <td className="py-3 text-sm text-zinc-700 max-w-xs truncate">{r.name}</td>
+              <td className="py-3 text-sm text-zinc-700">{r.name}</td>
               <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatNum(r.count)}</td>
               <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(r.revenue)}</td>
               <td className="py-3 text-sm font-mono text-emerald-600 text-right">{formatCurrencyPrecise(r.profit)}</td>

@@ -45,7 +45,7 @@ export default async function BugsPage() {
           <p className="text-sm text-zinc-500">Nothing logged yet. Use “Report Something” to add a bug or a request.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[720px]">
+            <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-zinc-200">
                   <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Status</th>
