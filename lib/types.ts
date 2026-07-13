@@ -50,6 +50,17 @@ export type SupplierRecord = {
   share_pct: number; // default % of profit the supplier takes on SPLIT orders
 };
 
+// A daily note — an internal business diary entry explaining what happened on a
+// given day (few sales, day off, platform issue, etc.). Stored in app_config.
+export type DailyNote = {
+  id: string;
+  date: string; // the day the note is about (can be past or future)
+  content: string;
+  author: string | null; // who wrote it (from their login)
+  created_at: string;
+  updated_at?: string;
+};
+
 // A bug report / feature request logged by a teammate. Stored in app_config.
 // An optional amount + unit lets them attach a $ or % to a financial issue.
 export type BugReport = {

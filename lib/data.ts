@@ -1,6 +1,6 @@
 import { db } from "./supabase";
 import { statusCategory } from "./orderStatus";
-import type { Order, SupplierRecord, BugReport } from "./types";
+import type { Order, SupplierRecord, BugReport, DailyNote } from "./types";
 
 // A refunded or cancelled order earned no profit — never count it.
 function earnsProfit(o: Order): boolean {
@@ -247,6 +247,14 @@ export async function getBugs(): Promise<BugReport[]> {
 }
 export async function saveBugs(list: BugReport[]): Promise<void> {
   await setConfig("bug_reports", list);
+}
+
+// --- Daily notes (internal diary; stored in app_config) ---
+export async function getNotes(): Promise<DailyNote[]> {
+  return getConfig<DailyNote[]>("daily_notes", []);
+}
+export async function saveNotes(list: DailyNote[]): Promise<void> {
+  await setConfig("daily_notes", list);
 }
 
 // --- Per-platform fees (editable %, keyed by workspace slug) ---
