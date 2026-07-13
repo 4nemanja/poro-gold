@@ -5,6 +5,7 @@ import { analyzeBatches, type BatchAnalysis, type Ranked } from "@/lib/batches";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
 import { BatchSelector } from "@/components/BatchSelector";
+import { BreakdownTable } from "@/components/BreakdownTable";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import { Layers, TrendingUp, TrendingDown, Package, Truck, Lightbulb, CheckCircle2, Clock } from "lucide-react";
 
@@ -181,32 +182,3 @@ function Highlight({ title, icon, r, metric }: { title: string; icon: React.Reac
   );
 }
 
-function BreakdownTable({ rows, firstCol }: { rows: Ranked[]; firstCol: string }) {
-  if (rows.length === 0) return <p className="text-sm text-zinc-500">No {firstCol.toLowerCase()} data for this batch.</p>;
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="border-b border-zinc-200">
-            <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">{firstCol}</th>
-            <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Orders</th>
-            <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Revenue</th>
-            <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Profit</th>
-            <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Margin</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-200">
-          {rows.map((r) => (
-            <tr key={r.name} className="hover:bg-zinc-50 transition-colors">
-              <td className="py-3 text-sm text-zinc-700">{r.name}</td>
-              <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatNum(r.count)}</td>
-              <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(r.revenue)}</td>
-              <td className="py-3 text-sm font-mono text-emerald-600 text-right">{formatCurrencyPrecise(r.profit)}</td>
-              <td className="py-3 text-sm font-mono text-zinc-500 text-right">{r.revenue > 0 ? pct(r.marginPct) : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
