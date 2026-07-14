@@ -1,7 +1,7 @@
 import { sumRevenue, sumProfit, sumCost, getNotes } from "@/lib/data";
 import { loadOrders, resolvePeriod, inRange, makeStatusMatch, addDateFor, type ViewParams } from "@/lib/ordersView";
 import { isCompleted, isInProgress } from "@/lib/orderStatus";
-import { getWorkspace } from "@/lib/workspaces";
+import { resolveWorkspace } from "@/lib/data";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card } from "@/components/ui/Card";
 import { OrderModal } from "@/components/OrderModal";
@@ -25,7 +25,7 @@ export default async function MainDashboard({
   const sp = await searchParams;
   const { from, to, label } = resolvePeriod(sp);
   const statusMatch = makeStatusMatch(sp);
-  const ws = sp.ws ? getWorkspace(sp.ws) : null;
+  const ws = sp.ws ? await resolveWorkspace(sp.ws) : null;
 
   const { all } = await loadOrders();
   const visible = all.filter(

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
-import { getWorkspace } from "@/lib/workspaces";
-import { computeOrderProfit, setOrderExtra, getPlatformFees } from "@/lib/data";
+import { computeOrderProfit, setOrderExtra, getPlatformFees, resolveWorkspace } from "@/lib/data";
 
 // Manually-added orders live in the shared `orders` table with source='manual'.
 // Only manual rows can be edited/deleted (API/Excel rows are read-only).
@@ -26,7 +25,7 @@ function truthy(v: unknown): boolean {
 }
 
 async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; error: string } | { ok: true; fields: Fields; extra: Extra }> {
-  const ws = getWorkspace(String(body.workspace ?? ""));
+  const ws = await resolveWorkspace(String(body.workspace ?? ""));
   if (!ws) return { ok: false, error: "Pick a valid website." };
   const product = String(body.product ?? "").trim();
   if (!product) return { ok: false, error: "Product is required." };

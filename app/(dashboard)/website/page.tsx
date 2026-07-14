@@ -1,11 +1,11 @@
 import { sumRevenue, getPlatformFees } from "@/lib/data";
-import { WORKSPACES } from "@/lib/workspaces";
 import { loadOrders, resolvePeriod, inRange, makeStatusMatch, type ViewParams } from "@/lib/ordersView";
 import { isCompleted } from "@/lib/orderStatus";
 import { Card } from "@/components/ui/Card";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { StatusFilter } from "@/components/StatusFilter";
 import { PlatformFeeCell } from "@/components/PlatformFeeCell";
+import { AddWebsiteModal } from "@/components/AddWebsiteModal";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import { platformBadgeClass } from "@/lib/platformBadge";
 
@@ -21,13 +21,13 @@ export default async function ByWebsite({
   // default previously hid any sale not dated today, which read as a bug.
   const { from, to, label } = resolvePeriod(sp, "all");
   const statusMatch = makeStatusMatch(sp);
-  const [{ perWs }, withdrawalFees, sellingFees] = await Promise.all([
+  const [{ perWs, workspaces }, withdrawalFees, sellingFees] = await Promise.all([
     loadOrders(),
     getPlatformFees("withdrawal"),
     getPlatformFees("selling"),
   ]);
 
-  const rows = WORKSPACES.map((w, i) => {
+  const rows = workspaces.map((w, i) => {
     const p = perWs[i].filter((o) => inRange(o, from, to) && statusMatch(o));
     return {
       ...w,
@@ -51,7 +51,7 @@ export default async function ByWebsite({
 
       <StatusFilter />
 
-      <Card title="By Website">
+      <Card title="By Website" action={<AddWebsiteModal />}>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-zinc-200">

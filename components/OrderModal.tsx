@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, X } from "lucide-react";
-import { WORKSPACES } from "@/lib/workspaces";
+import { WORKSPACES, type Workspace } from "@/lib/workspaces";
 import type { Order } from "@/lib/types";
 
 const STATUSES = [
@@ -28,6 +28,18 @@ export function OrderModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGift, setIsGift] = useState(!!order?.is_gift);
+  const [websites, setWebsites] = useState<Workspace[]>(WORKSPACES);
+
+  // Load the full website list (including user-added ones) when the modal opens.
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    fetch("/api/websites")
+      .then((r) => r.json())
+      .then((d) => { if (alive && d.ok) setWebsites(d.websites); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [open]);
 
   const isEdit = !!order;
   const today = new Date().toISOString().slice(0, 10);
@@ -88,7 +100,7 @@ export function OrderModal({
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Platform">
                   <select name="workspace" defaultValue={order?.workspace ?? defaultWorkspace ?? WORKSPACES[0].slug} className={inputCls} required>
-                    {WORKSPACES.map((w) => (
+                    {websites.map((w) => (
                       <option key={w.slug} value={w.slug}>{w.name}</option>
                     ))}
                   </select>

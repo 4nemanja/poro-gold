@@ -1,5 +1,6 @@
 import { db } from "./supabase";
 import { statusCategory } from "./orderStatus";
+import { WORKSPACES, type Workspace } from "./workspaces";
 import type { Order, SupplierRecord, BugReport, DailyNote } from "./types";
 
 // A refunded or cancelled order earned no profit — never count it.
@@ -247,6 +248,22 @@ export async function getBugs(): Promise<BugReport[]> {
 }
 export async function saveBugs(list: BugReport[]): Promise<void> {
   await setConfig("bug_reports", list);
+}
+
+// --- Custom websites (user-added marketplaces, stored in app_config) ---
+// The built-in WORKSPACES are always present; these extend them.
+export async function getCustomWebsites(): Promise<Workspace[]> {
+  return getConfig<Workspace[]>("custom_websites", []);
+}
+export async function saveCustomWebsites(list: Workspace[]): Promise<void> {
+  await setConfig("custom_websites", list);
+}
+export async function getAllWorkspaces(): Promise<Workspace[]> {
+  return [...WORKSPACES, ...(await getCustomWebsites())];
+}
+export async function resolveWorkspace(slug: string): Promise<Workspace | null> {
+  const s = (slug ?? "").toLowerCase();
+  return (await getAllWorkspaces()).find((w) => w.slug === s) ?? null;
 }
 
 // --- Daily notes (internal diary; stored in app_config) ---

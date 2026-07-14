@@ -43,7 +43,7 @@ export type BatchAnalysis = {
   insights: string[];
 };
 
-function rank(orders: Order[], keyOf: (o: Order) => string): Ranked[] {
+export function rankOrders(orders: Order[], keyOf: (o: Order) => string): Ranked[] {
   const m = new Map<string, Ranked>();
   for (const o of orders) {
     const name = keyOf(o) || "—";
@@ -103,8 +103,8 @@ export function analyzeBatches(batches: InvestmentBatch[], orders: Order[]): Bat
     const profit = r2(inWindow.reduce((a, o) => a + earned(o), 0));
     const marginPct = revenue > 0 ? r2((profit / revenue) * 100) : 0;
 
-    const byProduct = rank(inWindow, (o) => o.product ?? "—");
-    const bySupplier = rank(inWindow.filter((o) => o.supplier), (o) => o.supplier ?? "—");
+    const byProduct = rankOrders(inWindow, (o) => o.product ?? "—");
+    const bySupplier = rankOrders(inWindow.filter((o) => o.supplier), (o) => o.supplier ?? "—");
     const bestProduct = byProduct[0] ?? null;
     const commonProduct = [...byProduct].sort((a, b) => b.count - a.count)[0] ?? null;
     const bestSupplier = bySupplier[0] ?? null;

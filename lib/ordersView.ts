@@ -1,5 +1,4 @@
-import { getAllOrders, getWorkspaceOrders } from "./data";
-import { WORKSPACES } from "./workspaces";
+import { getAllOrders, getWorkspaceOrders, getAllWorkspaces } from "./data";
 import { statusCategory } from "./orderStatus";
 import type { Order } from "./types";
 
@@ -41,10 +40,13 @@ export function addDateFor(sp?: ViewParams) {
 }
 
 // Loads all orders + per-workspace slices (already July-1-cutoff filtered).
+// Includes user-added websites, and returns the workspace list it used so pages
+// can render rows in the same order.
 export async function loadOrders() {
+  const workspaces = await getAllWorkspaces();
   const [all, ...perWs] = await Promise.all([
     getAllOrders(),
-    ...WORKSPACES.map((w) => getWorkspaceOrders(w.slug)),
+    ...workspaces.map((w) => getWorkspaceOrders(w.slug)),
   ]);
-  return { all, perWs };
+  return { all, perWs, workspaces };
 }

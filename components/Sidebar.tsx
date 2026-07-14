@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Globe, Truck, Undo2, Wallet, Gift, Zap, LineChart, Bug, Layers, NotebookPen } from "lucide-react";
+import { LayoutDashboard, Globe, Truck, Undo2, Wallet, Gift, Zap, LineChart, Bug, Layers, NotebookPen, Package } from "lucide-react";
 
 const NAV = [
   { icon: LayoutDashboard, label: "Main Dashboard", href: "/" },
   { icon: LineChart, label: "Profit & Costs", href: "/analytics" },
+  { icon: Package, label: "Products", href: "/products" },
   { icon: Globe, label: "By Website", href: "/website" },
   { icon: Truck, label: "Suppliers", href: "/suppliers" },
   { icon: Undo2, label: "Refunded", href: "/refunded" },
