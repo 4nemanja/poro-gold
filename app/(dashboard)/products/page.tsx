@@ -1,4 +1,4 @@
-import { loadOrders, resolvePeriod, inRange, makeStatusMatch, type ViewParams } from "@/lib/ordersView";
+import { loadOrders, resolvePeriod, inRange, makeStatusMatch, notRefunded, type ViewParams } from "@/lib/ordersView";
 import { rankOrders } from "@/lib/batches";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
@@ -20,7 +20,7 @@ export default async function ProductsPage({
   const statusMatch = makeStatusMatch(sp);
   const { all } = await loadOrders();
 
-  const visible = all.filter((o) => inRange(o, from, to) && statusMatch(o));
+  const visible = all.filter((o) => inRange(o, from, to) && statusMatch(o) && notRefunded(o));
   const products = rankOrders(visible, (o) => o.product ?? "—");
 
   const totalProfit = products.reduce((a, p) => a + p.profit, 0);

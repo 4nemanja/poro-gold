@@ -1,5 +1,5 @@
 import { sumRevenue, sumCost, sumProfit, sumFees, sumSupplierCuts } from "@/lib/data";
-import { loadOrders, todayISO } from "@/lib/ordersView";
+import { loadOrders, todayISO, notRefunded } from "@/lib/ordersView";
 import { Card } from "@/components/ui/Card";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import type { Order } from "@/lib/types";
@@ -25,7 +25,9 @@ function inWindow(o: Order, from: string, to: string) {
 }
 
 export default async function AnalyticsPage() {
-  const { all } = await loadOrders();
+  const { all: everything } = await loadOrders();
+  // Refunded orders are excluded from all analytics — they only live in Refunded.
+  const all = everything.filter(notRefunded);
   const today = todayISO();
   const weekAgo = shiftDays(today, -6); // last 7 days incl. today
   const monthAgo = shiftDays(today, -29); // last 30 days incl. today

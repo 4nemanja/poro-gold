@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
-import { computeOrderProfit, setOrderExtra, getPlatformFees, resolveWorkspace } from "@/lib/data";
+import { computeOrderProfit, setOrderExtra, getPlatformFees, resolveWorkspace, setRefundReason } from "@/lib/data";
 
 // Manually-added orders live in the shared `orders` table with source='manual'.
 // Only manual rows can be edited/deleted (API/Excel rows are read-only).
@@ -24,7 +24,7 @@ function truthy(v: unknown): boolean {
   return v === true || v === "true" || v === "on" || v === "1";
 }
 
-async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; error: string } | { ok: true; fields: Fields; extra: Extra }> {
+async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; error: string } | { ok: true; fields: Fields; extra: Extra; refundReason: string; isRefund: boolean }> {
   const ws = await resolveWorkspace(String(body.workspace ?? ""));
   if (!ws) return { ok: false, error: "Pick a valid website." };
   const product = String(body.product ?? "").trim();
@@ -35,6 +35,10 @@ async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Enter a valid date (YYYY-MM-DD)." };
   const status = String(body.status ?? "completed").toLowerCase();
   if (!VALID_STATUS.includes(status)) return { ok: false, error: "Invalid status." };
+  // A refund must have a reason. It's only sent (and required) when refunded;
+  // for other statuses we leave any previously saved reason untouched.
+  const refundReason = String(body.refund_reason ?? "").trim();
+  if (status === "refunded" && !refundReason) return { ok: false, error: "Please enter a refund reason." };
   const costRaw = body.cost;
   const cost = costRaw === "" || costRaw == null ? null : Number(costRaw);
   if (cost != null && Number.isNaN(cost)) return { ok: false, error: "Supplier cost must be a number." };
@@ -82,7 +86,15 @@ async function parseFields(body: Record<string, unknown>): Promise<{ ok: false; 
       is_gift: truthy(body.is_gift) || undefined,
       vbucks: truthy(body.is_gift) && Number(body.vbucks) > 0 ? Number(body.vbucks) : undefined,
     },
+    refundReason,
+    isRefund: status === "refunded",
   };
+}
+
+// Save/clear the refund reason. Only written when the order is refunded; for any
+// other status the previously saved reason is left untouched (not deleted).
+async function persistRefundReason(orderId: string, parsed: { refundReason: string; isRefund: boolean }): Promise<void> {
+  if (parsed.isRefund) await setRefundReason(orderId, parsed.refundReason);
 }
 
 // Bug #1: let a PlayerOK (or any) order be identified by the buyer's name instead
@@ -123,6 +135,7 @@ export async function POST(req: Request) {
     const { error } = await db().from("orders").insert(order);
     if (error) throw new Error(error.message);
     await setOrderExtra(order.order_id, parsed.extra);
+    await persistRefundReason(order.order_id, parsed);
     return NextResponse.json({ ok: true, order });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed to add order", 500);
@@ -146,6 +159,7 @@ export async function PUT(req: Request) {
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return bad("Order not found.", 404);
     await setOrderExtra(id, parsed.extra);
+    await persistRefundReason(id, parsed);
     return NextResponse.json({ ok: true, order: data[0] });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed to edit order", 500);
@@ -165,6 +179,7 @@ export async function DELETE(req: Request) {
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return bad("Only manually-added orders can be deleted.", 404);
     await setOrderExtra(id, null);
+    await setRefundReason(id, null);
     return NextResponse.json({ ok: true, deleted: id });
   } catch (e) {
     return bad(e instanceof Error ? e.message : "Failed to delete order", 500);

@@ -30,6 +30,13 @@ export function inRange(o: Order, from: string, to: string) {
   return !!o.date && o.date >= from && o.date <= to;
 }
 
+// A refunded order is treated as if it never happened for analytics/stats — it
+// only appears in the Refunded Orders section. Use this to drop them everywhere
+// else (counts, revenue, profit, By Website, Products, Batch Analysis, etc.).
+export function notRefunded(o: Order): boolean {
+  return statusCategory(o.status) !== "refunded";
+}
+
 export function makeStatusMatch(sp?: ViewParams) {
   const sel = sp?.status ? sp.status.split(",").filter(Boolean) : null;
   return (o: Order) => !sel || sel.includes(statusCategory(o.status));

@@ -1,5 +1,5 @@
 import { sumRevenue, sumProfit, sumCost, getNotes } from "@/lib/data";
-import { loadOrders, resolvePeriod, inRange, makeStatusMatch, addDateFor, type ViewParams } from "@/lib/ordersView";
+import { loadOrders, resolvePeriod, inRange, makeStatusMatch, notRefunded, addDateFor, type ViewParams } from "@/lib/ordersView";
 import { isCompleted, isInProgress } from "@/lib/orderStatus";
 import { resolveWorkspace } from "@/lib/data";
 import { StatCard } from "@/components/ui/StatCard";
@@ -29,7 +29,7 @@ export default async function MainDashboard({
 
   const { all } = await loadOrders();
   const visible = all.filter(
-    (o) => inRange(o, from, to) && statusMatch(o) && (!ws || o.workspace === ws.slug),
+    (o) => inRange(o, from, to) && statusMatch(o) && notRefunded(o) && (!ws || o.workspace === ws.slug),
   );
   const completed = visible.filter((o) => isCompleted(o.status));
   const inProgress = visible.filter((o) => isInProgress(o.status));

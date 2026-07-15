@@ -17,10 +17,12 @@ export function OrdersTable({
   orders,
   lastCol = "Date",
   useRefundDate = false,
+  showRefundReason = false,
 }: {
   orders: Order[];
   lastCol?: string;
   useRefundDate?: boolean;
+  showRefundReason?: boolean;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -36,6 +38,7 @@ export function OrdersTable({
           <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Supplier Cost</th>
           <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Profit</th>
           <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">{lastCol}</th>
+          {showRefundReason && <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Refund Reason</th>}
           <th className="pb-3 w-16"></th>
         </tr>
       </thead>
@@ -69,6 +72,9 @@ export function OrdersTable({
             <td className="py-3.5 text-sm text-zinc-500 text-right">
               {(useRefundDate ? (o.refunded_at ?? o.date) : o.date) ?? "—"}
             </td>
+            {showRefundReason && (
+              <td className="py-3.5 text-sm text-zinc-600 max-w-sm whitespace-pre-wrap">{o.refund_reason || "—"}</td>
+            )}
             <td className="py-3.5 text-right"><OrderRowActions order={o} /></td>
           </tr>
           );

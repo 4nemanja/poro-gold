@@ -32,7 +32,7 @@ export default async function InvestmentPage() {
   };
 
   const ledger = all
-    .filter((o) => o.cost != null && (o.date ?? "") >= LEDGER_START)
+    .filter((o) => o.cost != null && (o.date ?? "") >= LEDGER_START && statusCategory(o.status) !== "refunded")
     .map((o) => ({
       o,
       costUsd: toUsd(o.cost, o.currency),

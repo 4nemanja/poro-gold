@@ -1,5 +1,5 @@
 import { sumRevenue, getPlatformFees } from "@/lib/data";
-import { loadOrders, resolvePeriod, inRange, makeStatusMatch, type ViewParams } from "@/lib/ordersView";
+import { loadOrders, resolvePeriod, inRange, makeStatusMatch, notRefunded, type ViewParams } from "@/lib/ordersView";
 import { isCompleted } from "@/lib/orderStatus";
 import { Card } from "@/components/ui/Card";
 import { PeriodFilter } from "@/components/PeriodFilter";
@@ -28,7 +28,7 @@ export default async function ByWebsite({
   ]);
 
   const rows = workspaces.map((w, i) => {
-    const p = perWs[i].filter((o) => inRange(o, from, to) && statusMatch(o));
+    const p = perWs[i].filter((o) => inRange(o, from, to) && statusMatch(o) && notRefunded(o));
     return {
       ...w,
       orders: p.length,

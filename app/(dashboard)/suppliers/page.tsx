@@ -1,5 +1,5 @@
 import { getSuppliers } from "@/lib/data";
-import { loadOrders, resolvePeriod, inRange, makeStatusMatch, type ViewParams } from "@/lib/ordersView";
+import { loadOrders, resolvePeriod, inRange, makeStatusMatch, notRefunded, type ViewParams } from "@/lib/ordersView";
 import { Card } from "@/components/ui/Card";
 import { PeriodFilter } from "@/components/PeriodFilter";
 import { StatusFilter } from "@/components/StatusFilter";
@@ -19,7 +19,7 @@ export default async function SuppliersPage({
   const statusMatch = makeStatusMatch(sp);
   const [{ all }, managed] = await Promise.all([loadOrders(), getSuppliers()]);
 
-  const visible = all.filter((o) => inRange(o, from, to) && statusMatch(o));
+  const visible = all.filter((o) => inRange(o, from, to) && statusMatch(o) && notRefunded(o));
   const map = new Map<string, { orders: number; cost: number; revenue: number; supplierCut: number; withdrawal: number }>();
   for (const o of visible) {
     if (!o.supplier) continue;

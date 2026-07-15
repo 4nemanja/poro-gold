@@ -28,6 +28,7 @@ export function OrderModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGift, setIsGift] = useState(!!order?.is_gift);
+  const [status, setStatus] = useState(order?.status ?? "in_delivery");
   const [websites, setWebsites] = useState<Workspace[]>(WORKSPACES);
 
   // Load the full website list (including user-added ones) when the modal opens.
@@ -125,13 +126,26 @@ export function OrderModal({
                   <input name="supplier" defaultValue={order?.supplier ?? ""} placeholder="e.g. FFIN" className={inputCls} />
                 </Field>
                 <Field label="Status">
-                  <select name="status" defaultValue={order?.status ?? "in_delivery"} className={inputCls}>
+                  <select name="status" value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls}>
                     {STATUSES.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
                 </Field>
               </div>
+
+              {status === "refunded" && (
+                <Field label="Refund Reason">
+                  <textarea
+                    name="refund_reason"
+                    defaultValue={order?.refund_reason ?? ""}
+                    rows={3}
+                    required
+                    placeholder="Why was this order refunded? e.g. buyer opened a dispute, item unavailable."
+                    className={inputCls}
+                  />
+                </Field>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Supplier Cost">

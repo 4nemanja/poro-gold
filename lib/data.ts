@@ -87,7 +87,21 @@ export async function setOrderExtra(orderId: string, extra: OrderExtra | null): 
   await setConfig("order_extras", all);
 }
 
-function mergeExtras(orders: Order[], extras: OrderExtras): Order[] {
+// Refund reasons are kept in their own app_config map (not order_extras) so they
+// survive edits that rebuild the extra, and aren't deleted when the status
+// changes away from refunded.
+export type RefundReasons = Record<string, string>;
+export async function getRefundReasons(): Promise<RefundReasons> {
+  return getConfig<RefundReasons>("refund_reasons", {});
+}
+export async function setRefundReason(orderId: string, reason: string | null): Promise<void> {
+  const all = await getRefundReasons();
+  if (reason && reason.trim()) all[orderId] = reason.trim();
+  else delete all[orderId];
+  await setConfig("refund_reasons", all);
+}
+
+function mergeExtras(orders: Order[], extras: OrderExtras, reasons: RefundReasons): Order[] {
   for (const o of orders) {
     const e = extras[o.order_id];
     if (e) {
@@ -99,17 +113,19 @@ function mergeExtras(orders: Order[], extras: OrderExtras): Order[] {
       o.is_gift = e.is_gift ?? null;
       o.vbucks = e.vbucks ?? null;
     }
+    o.refund_reason = reasons[o.order_id] ?? null;
   }
   return orders;
 }
 
 export async function getAllOrders(): Promise<Order[]> {
-  const [{ data, error }, extras] = await Promise.all([
+  const [{ data, error }, extras, reasons] = await Promise.all([
     db().from("orders").select("*").gte("date", BUSINESS_START),
     getOrderExtras(),
+    getRefundReasons(),
   ]);
   if (error) throw new Error(`orders query failed: ${error.message}`);
-  return mergeExtras((data ?? []).map(rowToOrder), extras).sort(orderRecencySort);
+  return mergeExtras((data ?? []).map(rowToOrder), extras, reasons).sort(orderRecencySort);
 }
 
 // Orders flagged as gifts (they also live on the Main Dashboard). Used by the
@@ -120,12 +136,13 @@ export async function getGiftFlaggedOrders(): Promise<Order[]> {
 }
 
 export async function getWorkspaceOrders(workspace: string): Promise<Order[]> {
-  const [{ data, error }, extras] = await Promise.all([
+  const [{ data, error }, extras, reasons] = await Promise.all([
     db().from("orders").select("*").eq("workspace", workspace).gte("date", BUSINESS_START),
     getOrderExtras(),
+    getRefundReasons(),
   ]);
   if (error) throw new Error(`orders query failed: ${error.message}`);
-  return mergeExtras((data ?? []).map(rowToOrder), extras).sort(orderRecencySort);
+  return mergeExtras((data ?? []).map(rowToOrder), extras, reasons).sort(orderRecencySort);
 }
 
 // --- SKU catalog ---

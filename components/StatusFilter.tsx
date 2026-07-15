@@ -3,10 +3,11 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 
+// Refunded is intentionally omitted — refunded orders are excluded from these
+// views and only appear in the Refunded Orders section.
 const STATUSES = [
   { key: "completed", label: "Completed", on: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   { key: "in_delivery", label: "In Progress", on: "bg-amber-100 text-amber-800 border-amber-200" },
-  { key: "refunded", label: "Refunded", on: "bg-rose-100 text-rose-800 border-rose-200" },
   { key: "cancelled", label: "Cancelled", on: "bg-zinc-200 text-zinc-700 border-zinc-300" },
 ];
 const ALL = STATUSES.map((s) => s.key);

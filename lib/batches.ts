@@ -58,9 +58,12 @@ export function rankOrders(orders: Order[], keyOf: (o: Order) => string): Ranked
   return list.sort((a, b) => b.profit - a.profit);
 }
 
-export function analyzeBatches(batches: InvestmentBatch[], orders: Order[]): BatchAnalysis[] {
+export function analyzeBatches(batches: InvestmentBatch[], allOrders: Order[]): BatchAnalysis[] {
   const sorted = [...batches].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
   if (sorted.length === 0) return [];
+  // Refunded orders are excluded from batch analysis (treated as if they never
+  // happened) — they only appear in the Refunded Orders section.
+  const orders = allOrders.filter((o) => statusCategory(o.status) !== "refunded");
 
   // FIFO allocate every supplier payment to the oldest batch available on its date.
   const purse = sorted.map((b) => ({ id: b.id, date: b.date, rem: b.amount, spent: 0 }));

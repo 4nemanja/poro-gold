@@ -39,6 +39,9 @@ export type Order = {
   // System — one row, so status stays in sync and it's never duplicated.
   is_gift?: boolean | null;
   vbucks?: number | null; // V-Bucks amount when it's a gift order
+  // Why an order was refunded (required when status is refunded). Kept even if
+  // the status later changes, so it isn't lost. Stored in app_config.
+  refund_reason?: string | null;
 };
 
 // A supplier the user manages by hand. FIXED = you keep all profit; SPLIT = the
