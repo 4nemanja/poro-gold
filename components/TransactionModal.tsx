@@ -4,18 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, X } from "lucide-react";
 import type { SupplierTransaction } from "@/lib/types";
-import type { Workspace } from "@/lib/workspaces";
 
-// Add (no tx) or edit (tx provided) a supplier payment. Suppliers and platforms
-// come from the existing lists in the system (passed in from the page).
+// Add (no tx) or edit (tx provided) a supplier payment. Suppliers come from the
+// existing suppliers in the system (passed in from the page).
 export function TransactionModal({
   tx,
   suppliers,
-  platforms,
 }: {
   tx?: SupplierTransaction;
   suppliers: string[];
-  platforms: Workspace[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -77,22 +74,14 @@ export function TransactionModal({
                   <input name="date" type="date" defaultValue={tx?.date ?? today} className={cls} required />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Supplier">
-                  <select name="supplier" defaultValue={tx?.supplier ?? ""} className={cls} required>
-                    <option value="" disabled>Select supplier…</option>
-                    {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </Field>
-                <Field label="Platform">
-                  <select name="platform" defaultValue={tx?.platform ?? ""} className={cls} required>
-                    <option value="" disabled>Select platform…</option>
-                    {platforms.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
-                  </select>
-                </Field>
-              </div>
+              <Field label="Supplier">
+                <select name="supplier" defaultValue={tx?.supplier ?? ""} className={cls} required>
+                  <option value="" disabled>Select supplier…</option>
+                  {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
               <Field label="Reason">
-                <textarea name="reason" defaultValue={tx?.reason ?? ""} rows={3} placeholder="e.g. Payment for V-Bucks stock, week of Jul 14" className={cls} required />
+                <textarea name="reason" defaultValue={tx?.reason ?? ""} rows={3} placeholder="e.g. V-Bucks stock purchase · Supplier payout · Advance payment · Balance top-up · Order reimbursement" className={cls} required />
               </Field>
               {error && <p className="text-sm text-rose-600">{error}</p>}
               <div className="flex justify-end gap-3 pt-1">

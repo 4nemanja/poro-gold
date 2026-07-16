@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getTransactions, saveTransactions, resolveWorkspace } from "@/lib/data";
+import { getTransactions, saveTransactions } from "@/lib/data";
 import { COOKIE, verify } from "@/lib/auth";
 import type { SupplierTransaction } from "@/lib/types";
 
@@ -16,23 +16,21 @@ async function currentUser(): Promise<string | null> {
   return verify((await cookies()).get(COOKIE)?.value);
 }
 
-async function parse(body: Record<string, unknown>): Promise<{ error: string } | { fields: Omit<SupplierTransaction, "id" | "created_by" | "created_at"> }> {
+function parse(body: Record<string, unknown>): { error: string } | { fields: Omit<SupplierTransaction, "id" | "created_by" | "created_at"> } {
   const amount = Number(body.amount);
   if (Number.isNaN(amount) || amount <= 0) return { error: "Enter a valid amount." };
   const supplier = String(body.supplier ?? "").trim();
   if (!supplier) return { error: "Supplier is required." };
-  const ws = await resolveWorkspace(String(body.platform ?? ""));
-  if (!ws) return { error: "Pick a valid platform." };
   const reason = String(body.reason ?? "").trim();
   if (!reason) return { error: "Reason is required." };
   const date = String(body.date ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Enter a valid date (YYYY-MM-DD)." };
-  return { fields: { date, amount: Math.round(amount * 100) / 100, supplier, platform: ws.slug, reason } };
+  return { fields: { date, amount: Math.round(amount * 100) / 100, supplier, reason } };
 }
 
 export async function POST(req: Request) {
   try {
-    const p = await parse(await req.json());
+    const p = parse(await req.json());
     if ("error" in p) return bad(p.error);
     const tx: SupplierTransaction = {
       id: `TX-${Date.now().toString(36).toUpperCase()}`,
@@ -54,7 +52,7 @@ export async function PUT(req: Request) {
     const body = await req.json();
     const id = String(body.id ?? "");
     if (!id) return bad("Missing id.");
-    const p = await parse(body);
+    const p = parse(body);
     if ("error" in p) return bad(p.error);
     const list = await getTransactions();
     const tx = list.find((t) => t.id === id);

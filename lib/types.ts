@@ -65,13 +65,13 @@ export type DailyNote = {
 };
 
 // A payment/transfer sent to a supplier. Tracked on the Transactions page.
-// Stored in app_config.
+// Not tied to any platform — it's just money sent to a supplier. Stored in
+// app_config.
 export type SupplierTransaction = {
   id: string;
   date: string; // YYYY-MM-DD
   amount: number;
   supplier: string; // supplier name
-  platform: string; // workspace slug the money went through
   reason: string;
   created_by: string | null; // from the logged-in session
   created_at: string;
