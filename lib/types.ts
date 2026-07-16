@@ -64,6 +64,19 @@ export type DailyNote = {
   updated_at?: string;
 };
 
+// A payment/transfer sent to a supplier. Tracked on the Transactions page.
+// Stored in app_config.
+export type SupplierTransaction = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  supplier: string; // supplier name
+  platform: string; // workspace slug the money went through
+  reason: string;
+  created_by: string | null; // from the logged-in session
+  created_at: string;
+};
+
 // A bug report / feature request logged by a teammate. Stored in app_config.
 // An optional amount + unit lets them attach a $ or % to a financial issue.
 export type BugReport = {

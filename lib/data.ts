@@ -1,7 +1,7 @@
 import { db } from "./supabase";
 import { statusCategory } from "./orderStatus";
 import { WORKSPACES, type Workspace } from "./workspaces";
-import type { Order, SupplierRecord, BugReport, DailyNote } from "./types";
+import type { Order, SupplierRecord, BugReport, DailyNote, SupplierTransaction } from "./types";
 
 // A refunded or cancelled order earned no profit — never count it.
 function earnsProfit(o: Order): boolean {
@@ -289,6 +289,14 @@ export async function getNotes(): Promise<DailyNote[]> {
 }
 export async function saveNotes(list: DailyNote[]): Promise<void> {
   await setConfig("daily_notes", list);
+}
+
+// --- Supplier transactions (payments sent to suppliers; stored in app_config) ---
+export async function getTransactions(): Promise<SupplierTransaction[]> {
+  return getConfig<SupplierTransaction[]>("supplier_transactions", []);
+}
+export async function saveTransactions(list: SupplierTransaction[]): Promise<void> {
+  await setConfig("supplier_transactions", list);
 }
 
 // --- Per-platform fees (editable %, keyed by workspace slug) ---
