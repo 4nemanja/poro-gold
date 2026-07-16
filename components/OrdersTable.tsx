@@ -1,8 +1,16 @@
 import { OrderRowActions } from "@/components/OrderRowActions";
+import { RelativeTime } from "@/components/RelativeTime";
 import { formatCurrencyPrecise } from "@/lib/format";
 import { statusLabel, statusBadgeClass, statusCategory } from "@/lib/orderStatus";
 import { platformBadgeClass } from "@/lib/platformBadge";
 import type { Order } from "@/lib/types";
+
+// Best timestamp for "how long ago": manual orders carry a full added_at; synced
+// orders fall back to the relevant date (day-level).
+function orderInstant(o: Order, useRefundDate: boolean): string | null {
+  if (useRefundDate) return o.refunded_at ?? o.added_at ?? o.date ?? null;
+  return o.added_at ?? o.completed_at ?? o.date ?? null;
+}
 
 // A refunded or cancelled order earned nothing, so it never shows a profit.
 function profitOf(o: Order): number | null {
@@ -69,8 +77,9 @@ export function OrdersTable({
             <td className={`py-3.5 text-sm font-mono text-right ${profit == null ? "text-zinc-400" : profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
               {profit == null ? "—" : formatCurrencyPrecise(profit)}
             </td>
-            <td className="py-3.5 text-sm text-zinc-500 text-right">
-              {(useRefundDate ? (o.refunded_at ?? o.date) : o.date) ?? "—"}
+            <td className="py-3.5 text-sm text-right">
+              <div className="text-zinc-500">{(useRefundDate ? (o.refunded_at ?? o.date) : o.date) ?? "—"}</div>
+              <RelativeTime iso={orderInstant(o, useRefundDate)} className="text-xs text-zinc-400" />
             </td>
             {showRefundReason && (
               <td className="py-3.5 text-sm text-zinc-600 max-w-sm whitespace-pre-wrap">{o.refund_reason || "—"}</td>
