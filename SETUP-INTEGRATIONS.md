@@ -119,6 +119,47 @@ You need 3 values, taken from your browser while logged into playerok.com:
 > repeat steps 2–5 with fresh cookie values. This is the only site of the four
 > that needs occasional re-login, because it has no real API.
 
+You can also sync PlayerOK on its own by POSTing to `…/api/sync/playerok`
+(the main **Refresh** button already runs it alongside GameBoost).
+
+### PlayerOK integration — summary (BUG-MRNW…)
+
+**What was implemented.** A direct integration with Playerok's own GraphQL API
+(`lib/playerokSync.ts`), the same endpoint the Playerok website and the community
+`PlayerokAPI` library use. Given your session cookies it pulls your **deals**
+(orders) — id, product, price, buyer name, dates and delivery status — and upserts
+them into the database tagged **PlayerOK**. It runs on every **Refresh** and via a
+dedicated `/api/sync/playerok` endpoint.
+
+**Historical orders — YES, supported.** The `deals` query is cursor‑paginated and
+the sync loops through **every page**, so a single run imports your **entire order
+history** (orders created before the integration), not just new ones. Re‑running
+keeps each order's delivery status up to date.
+
+**Delivery confirmations.** Each deal carries a status; when a buyer confirms
+delivery the deal becomes *confirmed/completed*, which the sync maps to the order's
+**Completed** status. So "purchased" vs "delivery confirmed" is reflected by the
+order status after a sync.
+
+**Limitations & assumptions (important).**
+- **No official API and no events/webhook feed.** The unofficial API has **no way
+  to push new orders in real time** — the only way to detect a new order is to
+  **poll** the deals list. So this **supplements** your Telegram alerts (which stay
+  the instant heads‑up); it does not replace them with push. New orders land in the
+  DB on the next Refresh. (Automate it with a scheduled Refresh if you want it
+  hands‑off.)
+- **Session‑cookie auth that expires.** It authenticates as your logged‑in browser
+  (`token` + `__ddg5_`), not a stable API key. When those expire you must paste
+  fresh values. There's also an anti‑bot layer (DDoS‑Guard) that can block requests.
+- **Fragile to site changes.** Playerok can change its GraphQL schema or query
+  hashes at any time, which would break the field mapping until updated.
+- **Prices are in RUB.**
+- **Verification status:** the endpoint, request format and pagination are built to
+  Playerok's current API (verified the endpoint accepts our request shape), but the
+  live data pull **can only be confirmed with your real session cookies** — I don't
+  have those. Add them per the steps above and click Refresh to go live; if a field
+  comes back empty we may need a one‑line mapping tweak against a real response.
+
 ---
 
 ## What happens to cost / profit?
