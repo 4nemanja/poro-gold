@@ -22,7 +22,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Login failed");
-      router.replace("/");
+      router.replace("/management");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

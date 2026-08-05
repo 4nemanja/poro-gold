@@ -10,9 +10,9 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // The /portal route mounts the dashboard.poro SPA, which authenticates via
-  // its own Supabase Auth (not this app's cookie). Let it manage its own access.
-  if (pathname === "/portal" || pathname.startsWith("/portal/")) {
+  // The homepage (/) mounts the dashboard.poro SPA, which authenticates via its
+  // own Supabase Auth (not this app's cookie). Let it manage its own access.
+  if (pathname === "/") {
     return NextResponse.next();
   }
 

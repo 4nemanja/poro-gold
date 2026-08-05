@@ -5,23 +5,23 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Globe, Truck, Undo2, Wallet, Gift, Zap, LineChart, Bug, Layers, NotebookPen, Package, ArrowLeftRight } from "lucide-react";
 
 const NAV = [
-  { icon: LayoutDashboard, label: "Main Dashboard", href: "/" },
-  { icon: LineChart, label: "Profit & Costs", href: "/analytics" },
-  { icon: Package, label: "Products", href: "/products" },
-  { icon: Globe, label: "By Website", href: "/website" },
-  { icon: Truck, label: "Suppliers", href: "/suppliers" },
-  { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
-  { icon: Undo2, label: "Refunded", href: "/refunded" },
-  { icon: Wallet, label: "Investment", href: "/investment" },
-  { icon: Layers, label: "Batch Analysis", href: "/batches" },
-  { icon: Gift, label: "Gift System", href: "/gifts" },
-  { icon: NotebookPen, label: "Daily Notes", href: "/notes" },
-  { icon: Bug, label: "Bugs & Requests", href: "/bugs" },
+  { icon: LayoutDashboard, label: "Main Dashboard", href: "/management" },
+  { icon: LineChart, label: "Profit & Costs", href: "/management/analytics" },
+  { icon: Package, label: "Products", href: "/management/products" },
+  { icon: Globe, label: "By Website", href: "/management/website" },
+  { icon: Truck, label: "Suppliers", href: "/management/suppliers" },
+  { icon: ArrowLeftRight, label: "Transactions", href: "/management/transactions" },
+  { icon: Undo2, label: "Refunded", href: "/management/refunded" },
+  { icon: Wallet, label: "Investment", href: "/management/investment" },
+  { icon: Layers, label: "Batch Analysis", href: "/management/batches" },
+  { icon: Gift, label: "Gift System", href: "/management/gifts" },
+  { icon: NotebookPen, label: "Daily Notes", href: "/management/notes" },
+  { icon: Bug, label: "Bugs & Requests", href: "/management/bugs" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const active = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const active = (href: string) => (href === "/management" ? pathname === "/management" : pathname.startsWith(href));
 
   return (
     <aside className="w-64 border-r border-zinc-200 bg-white flex flex-col fixed h-full z-10">

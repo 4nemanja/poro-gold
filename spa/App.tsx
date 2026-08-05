@@ -15,7 +15,7 @@ type PortalRole = 'admin' | 'seller' | 'supplier';
 type AccessRole = PortalRole | 'management';
 const isPortalRole = (role: AccessRole): role is PortalRole =>
   role === 'admin' || role === 'seller' || role === 'supplier';
-const MANAGEMENT_URL = '/';
+const MANAGEMENT_URL = '/management';
 const openManagement = () => window.open(MANAGEMENT_URL, '_blank', 'noopener,noreferrer');
 
 const SESSION_STORAGE_KEY = 'vbucks_relay_session';
