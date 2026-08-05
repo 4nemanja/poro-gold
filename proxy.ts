@@ -10,6 +10,12 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // The /portal route mounts the dashboard.poro SPA, which authenticates via
+  // its own Supabase Auth (not this app's cookie). Let it manage its own access.
+  if (pathname === "/portal" || pathname.startsWith("/portal/")) {
+    return NextResponse.next();
+  }
+
   // Marketplace webhooks (G2G, iGV) are called by external services with no
   // session cookie — they authenticate via their own HMAC signature, verified
   // inside each route handler. They must bypass the app's cookie auth.

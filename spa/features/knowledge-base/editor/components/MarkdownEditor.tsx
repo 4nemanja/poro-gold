@@ -1,0 +1,25 @@
+import { useRef, useState, type KeyboardEvent } from 'react';
+import { Bold, Code, Heading2, Heading3, Image, Info, Italic, Link, List, ListOrdered, Quote, SeparatorHorizontal } from 'lucide-react';
+import { ArticleContent } from '../../components/ArticleContent';
+import type { KnowledgeBaseArticle } from '../../../../shared/types/knowledge-base';
+import { applyMarkdownFormat, applySafeColor, insertAttachmentImage, type MarkdownFormat, type SafeColor } from '../utils/markdownFormatting';
+import { InlineImageDialog } from './InlineImageDialog';
+
+interface MarkdownEditorProps { value: string; onChange: (value: string) => void; previewArticle: KnowledgeBaseArticle; articleId: string | null; }
+const controls: Array<{ label: string; icon: typeof Bold; format: MarkdownFormat }> = [
+  { label: 'Heading 2', icon: Heading2, format: 'h2' }, { label: 'Heading 3', icon: Heading3, format: 'h3' },
+  { label: 'Bold', icon: Bold, format: 'bold' }, { label: 'Italic', icon: Italic, format: 'italic' },
+  { label: 'Bulleted list', icon: List, format: 'bullet' }, { label: 'Numbered list', icon: ListOrdered, format: 'numbered' },
+  { label: 'Blockquote', icon: Quote, format: 'quote' }, { label: 'Inline code', icon: Code, format: 'inlineCode' },
+  { label: 'Code block', icon: Code, format: 'codeBlock' }, { label: 'Link', icon: Link, format: 'link' }, { label: 'Horizontal line', icon: SeparatorHorizontal, format: 'rule' },
+  { label: 'Info callout', icon: Info, format: 'info' }, { label: 'Warning callout', icon: Info, format: 'warning' }, { label: 'Success callout', icon: Info, format: 'success' },
+];
+
+export const MarkdownEditor = ({ value, onChange, previewArticle, articleId }: MarkdownEditorProps) => {
+  const ref = useRef<HTMLTextAreaElement>(null); const [preview, setPreview] = useState(false); const [imageOpen,setImageOpen]=useState(false); const [imagePosition,setImagePosition]=useState(0);
+  const apply = (format: MarkdownFormat) => { const node = ref.current; if (!node) return; const next = applyMarkdownFormat(value, node.selectionStart, node.selectionEnd, format); onChange(next.value); requestAnimationFrame(() => { node.focus(); node.setSelectionRange(next.selectionStart, next.selectionEnd); }); };
+  const color = (event: React.ChangeEvent<HTMLSelectElement>) => { const valueColor = event.target.value as SafeColor | ''; if (!valueColor || !ref.current) return; const node = ref.current; const next = applySafeColor(value, node.selectionStart, node.selectionEnd, valueColor); onChange(next.value); event.target.value = ''; requestAnimationFrame(() => { node.focus(); node.setSelectionRange(next.selectionStart, next.selectionEnd); }); };
+  const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (!(event.ctrlKey || event.metaKey)) return; const map: Record<string, MarkdownFormat> = { b: 'bold', i: 'italic', k: 'link' }; const format = map[event.key.toLowerCase()]; if (format) { event.preventDefault(); apply(format); } };
+  const words = value.trim() ? value.trim().split(/\s+/).length : 0;
+  return <><div className="kb-editor-shell rounded-lg border kb-border"><div className="flex flex-wrap gap-1 border-b kb-border p-2">{controls.map(({ label, icon: Icon, format }) => <button key={format} type="button" title={label} aria-label={label} onClick={() => apply(format)} className="kb-toolbar-button"><Icon className="h-4 w-4" /></button>)}<button type="button" title="Insert Image" aria-label="Insert Image" onClick={()=>{setImagePosition(ref.current?.selectionStart||0);setImageOpen(true);}} className="kb-toolbar-button"><Image className="h-4 w-4"/></button><select aria-label="Text color" defaultValue="" onChange={color} className="kb-toolbar-select"><option value="">Text color</option>{(['purple','blue','green','yellow','red'] as SafeColor[]).map((item)=><option key={item} value={item}>{item[0].toUpperCase()+item.slice(1)}</option>)}</select><button type="button" onClick={()=>setPreview(false)} className={`kb-toolbar-tab ${!preview?'kb-toolbar-tab-active':''}`}>Write</button><button type="button" onClick={()=>setPreview(true)} className={`kb-toolbar-tab ${preview?'kb-toolbar-tab-active':''}`}>Preview</button></div><div className="grid min-w-0 lg:grid-cols-2">{!preview&&<textarea ref={ref} rows={16} value={value} onChange={(event)=>onChange(event.target.value)} onKeyDown={keyDown} className="kb-editor m-0 min-h-[22rem] w-full resize-y border-0 p-3 font-mono text-sm" />}{<div className={`${preview?'block':'hidden lg:block'} min-h-[22rem] max-h-[50vh] overflow-y-auto border-t kb-border p-4 lg:border-l lg:border-t-0`}><ArticleContent article={previewArticle}/></div>}</div><div className="border-t kb-border px-3 py-2 text-xs kb-muted">{words} words · {value.length} characters</div></div><InlineImageDialog isOpen={imageOpen} articleId={articleId} onClose={()=>setImageOpen(false)} onInsert={(attachment,alt,caption)=>{const next=insertAttachmentImage(value,imagePosition,attachment.id,alt,caption);onChange(next.value);requestAnimationFrame(()=>{ref.current?.focus();ref.current?.setSelectionRange(next.selectionStart,next.selectionEnd);});}}/></>;
+};
