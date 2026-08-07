@@ -104,8 +104,6 @@ export default async function TrackerPage({
 
   const tiles = [
     { key: "profit", label: "Profit", value: actual.profit, target: profitTarget ?? 0, hasTarget: hasProfitTarget, money: true },
-    { key: "revenue", label: "Revenue", value: actual.revenue, target: target.revenue, hasTarget: hasBaseline, money: true },
-    { key: "orders", label: "Orders", value: actual.orders, target: target.orders, hasTarget: hasBaseline, money: false },
   ] as const;
 
   return (
@@ -135,12 +133,9 @@ export default async function TrackerPage({
             <div className="text-sm text-zinc-500">
               {monthLabel} goal: <span className="font-semibold text-emerald-700">{formatCurrencyPrecise(goal)}</span>{" "}
               profit over {daysInMonth} days
-              {hasBaseline && <> · revenue &amp; orders shown as {prevLabel} avg</>}
             </div>
             <div className="flex flex-wrap gap-6">
               <TargetStat label="Profit / day" value={formatCurrencyPrecise(profitTarget as number)} />
-              <TargetStat label="Revenue / day" value={hasBaseline ? formatCurrencyPrecise(target.revenue) : "—"} />
-              <TargetStat label="Orders / day" value={hasBaseline ? target.orders.toFixed(1) : "—"} />
             </div>
           </div>
         ) : hasBaseline ? (
@@ -151,8 +146,6 @@ export default async function TrackerPage({
             </div>
             <div className="flex flex-wrap gap-6">
               <TargetStat label="Profit / day" value={formatCurrencyPrecise(target.profit)} />
-              <TargetStat label="Revenue / day" value={formatCurrencyPrecise(target.revenue)} />
-              <TargetStat label="Orders / day" value={target.orders.toFixed(1)} />
             </div>
           </div>
         ) : (
@@ -173,7 +166,7 @@ export default async function TrackerPage({
           </div>
           <TrackerDatePicker date={sel} today={today} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {tiles.map((t) => {
             const met = t.hasTarget && t.value >= t.target;
             const pct = t.target > 0 ? Math.round((t.value / t.target) * 100) : 0;
