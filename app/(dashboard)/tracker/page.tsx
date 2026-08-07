@@ -2,6 +2,7 @@ import { sumRevenue, sumCost, sumProfit, sumFees } from "@/lib/data";
 import { loadOrders, todayISO, notRefunded } from "@/lib/ordersView";
 import { Card } from "@/components/ui/Card";
 import { TrackerDatePicker } from "@/components/TrackerDatePicker";
+import { monthlyProfitGoal } from "@/lib/goals";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { Target, TrendingUp, TrendingDown, Check, X } from "lucide-react";
@@ -60,6 +61,17 @@ export default async function TrackerPage({
     cost: prevTotals.cost / daysInPrev,
   };
 
+  // A monthly profit goal (if set for the selected month) overrides the
+  // baseline: the per-day profit target becomes goal / days-in-month.
+  const monthKey = sel.slice(0, 7);
+  const monthLabel = new Date(Date.UTC(y, m, 1)).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const goal = monthlyProfitGoal(monthKey);
+  const goalDailyProfit = goal != null ? goal / daysInMonth : null;
+  // Effective per-day profit target: goal-driven, else last-month average.
+  const profitTarget = goalDailyProfit ?? (hasBaseline ? target.profit : null);
+  const hasProfitTarget = profitTarget != null;
+
   // Selected day's actuals.
   const dayOrders = all.filter((o) => o.date === sel);
   const actual = {
@@ -74,8 +86,14 @@ export default async function TrackerPage({
   const monthFrom = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
   const monthOrders = all.filter((o) => !!o.date && o.date >= monthFrom && o.date <= sel);
   const mtdProfit = sumProfit(monthOrders);
-  const expectedProfit = target.profit * dayOfMonth;
+  const expectedProfit = (profitTarget ?? 0) * dayOfMonth;
   const paceDelta = mtdProfit - expectedProfit;
+
+  // Goal tracking: how much profit is left this month, and what's needed per
+  // remaining day (days after the selected one) to still hit the goal.
+  const daysLeft = daysInMonth - dayOfMonth;
+  const remaining = goal != null ? goal - mtdProfit : null;
+  const neededPerDay = goal != null && daysLeft > 0 ? (remaining as number) / daysLeft : null;
 
   // Daily log — last 14 days, newest first, scored against the daily profit target.
   const log: { date: string; orders: Order[] }[] = [];
@@ -85,9 +103,9 @@ export default async function TrackerPage({
   }
 
   const tiles = [
-    { key: "profit", label: "Profit", value: actual.profit, target: target.profit, money: true },
-    { key: "revenue", label: "Revenue", value: actual.revenue, target: target.revenue, money: true },
-    { key: "orders", label: "Orders", value: actual.orders, target: target.orders, money: false },
+    { key: "profit", label: "Profit", value: actual.profit, target: profitTarget ?? 0, hasTarget: hasProfitTarget, money: true },
+    { key: "revenue", label: "Revenue", value: actual.revenue, target: target.revenue, hasTarget: hasBaseline, money: true },
+    { key: "orders", label: "Orders", value: actual.orders, target: target.orders, hasTarget: hasBaseline, money: false },
   ] as const;
 
   return (
@@ -95,20 +113,37 @@ export default async function TrackerPage({
       <div>
         <h1 className="text-2xl font-bold text-zinc-900">Daily Tracker</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Your daily KPIs vs the targets to hit — set from last month&apos;s average.
+          Your daily KPIs vs the target to hit — from your monthly goal, or last month&apos;s average.
         </p>
       </div>
 
-      {/* Baseline / targets */}
+      {/* Targets */}
       <Card
         title={
           <span className="flex items-center gap-2">
             <Target size={16} className="text-emerald-600" /> Daily Targets
           </span>
         }
-        action={<span className="text-xs text-zinc-400">based on {prevLabel}</span>}
+        action={
+          <span className="text-xs text-zinc-400">
+            {goal != null ? `${monthLabel} goal` : `based on ${prevLabel}`}
+          </span>
+        }
       >
-        {hasBaseline ? (
+        {goal != null ? (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-zinc-500">
+              {monthLabel} goal: <span className="font-semibold text-emerald-700">{formatCurrencyPrecise(goal)}</span>{" "}
+              profit over {daysInMonth} days
+              {hasBaseline && <> · revenue &amp; orders shown as {prevLabel} avg</>}
+            </div>
+            <div className="flex flex-wrap gap-6">
+              <TargetStat label="Profit / day" value={formatCurrencyPrecise(profitTarget as number)} />
+              <TargetStat label="Revenue / day" value={hasBaseline ? formatCurrencyPrecise(target.revenue) : "—"} />
+              <TargetStat label="Orders / day" value={hasBaseline ? target.orders.toFixed(1) : "—"} />
+            </div>
+          </div>
+        ) : hasBaseline ? (
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-zinc-500">
               {prevLabel}: {formatCurrencyPrecise(prevTotals.profit)} profit from {formatNum(prevTotals.orders)} orders
@@ -122,7 +157,7 @@ export default async function TrackerPage({
           </div>
         ) : (
           <div className="text-sm text-zinc-500">
-            No orders in {prevLabel} yet, so there is no baseline to set targets from.
+            No goal set for {monthLabel} and no orders in {prevLabel}, so there is no target yet.
           </div>
         )}
       </Card>
@@ -140,14 +175,14 @@ export default async function TrackerPage({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {tiles.map((t) => {
-            const met = hasBaseline && t.value >= t.target;
+            const met = t.hasTarget && t.value >= t.target;
             const pct = t.target > 0 ? Math.round((t.value / t.target) * 100) : 0;
             const fmt = (n: number) => (t.money ? formatCurrencyPrecise(n) : formatNum(Math.round(n)));
             return (
               <Card key={t.key}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-zinc-700">{t.label}</span>
-                  {hasBaseline &&
+                  {t.hasTarget &&
                     (met ? (
                       <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
                         <Check size={14} /> Target met
@@ -160,7 +195,7 @@ export default async function TrackerPage({
                 </div>
                 <div className="mt-2 text-2xl font-bold font-mono text-zinc-900">{fmt(t.value)}</div>
                 <div className="mt-1 text-xs text-zinc-400">
-                  target {hasBaseline ? fmt(t.target) : "—"}
+                  target {t.hasTarget ? fmt(t.target) : "—"}
                 </div>
                 <div className="mt-3 h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
                   <div
@@ -175,12 +210,30 @@ export default async function TrackerPage({
       </div>
 
       {/* Month-to-date pace */}
-      <Card title={`Month-to-date pace — ${sel.slice(0, 7)}`}>
+      <Card
+        title={`Month-to-date pace — ${sel.slice(0, 7)}`}
+        action={goal != null ? <span className="text-xs text-zinc-400">goal {formatCurrencyPrecise(goal)}</span> : undefined}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-zinc-500">
             Day {dayOfMonth} of the month — you should be around{" "}
             <span className="font-mono text-zinc-700">{formatCurrencyPrecise(expectedProfit)}</span> profit by{" "}
             {isToday ? "now" : sel}.
+            {goal != null && (remaining as number) > 0 && (
+              <>
+                {" "}To hit {formatCurrencyPrecise(goal)},{" "}
+                {daysLeft > 0 ? (
+                  <>
+                    you need{" "}
+                    <span className="font-mono text-zinc-700">{formatCurrencyPrecise(neededPerDay as number)}</span>/day for
+                    the remaining {daysLeft} day{daysLeft === 1 ? "" : "s"}.
+                  </>
+                ) : (
+                  <>the month is over — short by {formatCurrencyPrecise(remaining as number)}.</>
+                )}
+              </>
+            )}
+            {goal != null && (remaining as number) <= 0 && <> Goal reached — {formatCurrencyPrecise(-(remaining as number))} over. 🎉</>}
           </div>
           <div className="flex flex-wrap gap-6">
             <div>
@@ -195,6 +248,14 @@ export default async function TrackerPage({
                 {formatCurrencyPrecise(Math.abs(paceDelta))}
               </div>
             </div>
+            {goal != null && (
+              <div>
+                <div className="text-xs text-zinc-400 uppercase">Remaining</div>
+                <div className="font-mono text-lg font-bold text-zinc-700">
+                  {formatCurrencyPrecise(Math.max(0, remaining as number))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -218,7 +279,7 @@ export default async function TrackerPage({
               {log.map((d) => {
                 const profit = sumProfit(d.orders);
                 const empty = d.orders.length === 0;
-                const met = hasBaseline && profit >= target.profit;
+                const met = hasProfitTarget && profit >= (profitTarget as number);
                 const rowIsToday = d.date === today;
                 const rowIsSel = d.date === sel;
                 return (
@@ -234,7 +295,7 @@ export default async function TrackerPage({
                     <td className={`py-3 text-sm font-mono text-right ${empty ? "" : profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                       {formatCurrencyPrecise(profit)}
                     </td>
-                    <td className="py-3 text-sm font-mono text-zinc-400 text-right">{hasBaseline ? formatCurrencyPrecise(target.profit) : "—"}</td>
+                    <td className="py-3 text-sm font-mono text-zinc-400 text-right">{hasProfitTarget ? formatCurrencyPrecise(profitTarget as number) : "—"}</td>
                     <td className="py-3 text-center">
                       {empty ? (
                         <span className="text-zinc-300">—</span>
