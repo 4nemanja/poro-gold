@@ -1,6 +1,7 @@
 import { sumRevenue, sumCost, sumProfit, sumFees, sumSupplierCuts } from "@/lib/data";
 import { loadOrders, todayISO, notRefunded } from "@/lib/ordersView";
 import { Card } from "@/components/ui/Card";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { TrendingUp, TrendingDown } from "lucide-react";
@@ -24,13 +25,28 @@ function inWindow(o: Order, from: string, to: string) {
   return !!o.date && o.date >= from && o.date <= to;
 }
 
-export default async function AnalyticsPage() {
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string }>;
+}) {
+  const sp = await searchParams;
   const { all: everything } = await loadOrders();
   // Refunded orders are excluded from all analytics — they only live in Refunded.
   const all = everything.filter(notRefunded);
   const today = todayISO();
   const weekAgo = shiftDays(today, -6); // last 7 days incl. today
   const monthAgo = shiftDays(today, -29); // last 30 days incl. today
+
+  // Custom range from ?from=&to= (defaults to the last 7 days). `from` may be
+  // after `to`; we swap them so the window is always valid.
+  const rawFrom = ISO_DATE.test(sp.from ?? "") ? sp.from! : weekAgo;
+  const rawTo = ISO_DATE.test(sp.to ?? "") ? sp.to! : today;
+  const rangeFrom = rawFrom <= rawTo ? rawFrom : rawTo;
+  const rangeTo = rawFrom <= rawTo ? rawTo : rawFrom;
+  const rangeOrders = all.filter((o) => inWindow(o, rangeFrom, rangeTo));
 
   const todays = all.filter((o) => o.date === today);
   const week = all.filter((o) => inWindow(o, weekAgo, today));
@@ -91,6 +107,38 @@ export default async function AnalyticsPage() {
           </Card>
         ))}
       </div>
+
+      <Card
+        title="Custom Range"
+        action={<DateRangeFilter from={rangeFrom} to={rangeTo} />}
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-zinc-500">
+            {rangeFrom} → {rangeTo}
+            <span className="ml-2 text-xs text-zinc-400">{formatNum(rangeOrders.length)} orders</span>
+          </div>
+          <div className="flex flex-wrap gap-6">
+            <div>
+              <div className="text-xs text-zinc-400 uppercase">Revenue</div>
+              <div className="font-mono text-lg text-zinc-800">{formatCurrencyPrecise(sumRevenue(rangeOrders))}</div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-400 uppercase">Costs</div>
+              <div className="flex items-baseline gap-1">
+                <TrendingDown size={14} className="text-rose-500" />
+                <span className="font-mono text-lg text-rose-600">{formatCurrencyPrecise(costOf(rangeOrders))}</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-400 uppercase">Profit</div>
+              <div className="flex items-baseline gap-1">
+                <TrendingUp size={16} className="text-emerald-600" />
+                <span className="font-mono text-lg font-bold text-emerald-600">{formatCurrencyPrecise(sumProfit(rangeOrders))}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card title="Daily Breakdown" action={<span className="text-xs text-zinc-400">last 14 days</span>}>
         <BreakdownTable

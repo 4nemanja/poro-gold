@@ -5,14 +5,14 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Globe, Truck, Undo2, Wallet, Gift, Zap, LineChart, Bug, Layers, NotebookPen, Package, ArrowLeftRight } from "lucide-react";
 
 const NAV = [
-  { icon: LayoutDashboard, label: "Main Dashboard", href: "/" },
-  { icon: LineChart, label: "Profit & Costs", href: "/analytics" },
+  { icon: LayoutDashboard, label: "Main Dashboard", href: "/", highlight: true },
+  { icon: LineChart, label: "Profit & Costs", href: "/analytics", highlight: true },
+  { icon: Wallet, label: "Investment", href: "/investment", highlight: true },
+  { icon: ArrowLeftRight, label: "Transactions", href: "/transactions", highlight: true },
   { icon: Package, label: "Products", href: "/products" },
   { icon: Globe, label: "By Website", href: "/website" },
   { icon: Truck, label: "Suppliers", href: "/suppliers" },
-  { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
   { icon: Undo2, label: "Refunded", href: "/refunded" },
-  { icon: Wallet, label: "Investment", href: "/investment" },
   { icon: Layers, label: "Batch Analysis", href: "/batches" },
   { icon: Gift, label: "Gift System", href: "/gifts" },
   { icon: NotebookPen, label: "Daily Notes", href: "/notes" },
@@ -33,17 +33,29 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {NAV.map(({ icon: Icon, label, href }) => {
+        {NAV.map(({ icon: Icon, label, href, highlight }) => {
           const on = active(href);
+          const base = on
+            ? highlight
+              ? "bg-emerald-100 text-emerald-800"
+              : "bg-zinc-100 text-zinc-900"
+            : highlight
+            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50";
+          const iconColor = on
+            ? highlight
+              ? "text-emerald-700"
+              : "text-zinc-900"
+            : highlight
+            ? "text-emerald-500"
+            : "text-zinc-400";
           return (
             <Link
               key={href}
               href={href}
-              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                on ? "bg-zinc-100 text-zinc-900" : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
-              }`}
+              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${base}`}
             >
-              <Icon size={18} className={`mr-3 ${on ? "text-zinc-900" : "text-zinc-400"}`} />
+              <Icon size={18} className={`mr-3 ${iconColor}`} />
               {label}
             </Link>
           );
