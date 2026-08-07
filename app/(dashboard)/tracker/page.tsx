@@ -1,11 +1,14 @@
 import { sumRevenue, sumCost, sumProfit, sumFees } from "@/lib/data";
 import { loadOrders, todayISO, notRefunded } from "@/lib/ordersView";
 import { Card } from "@/components/ui/Card";
+import { TrackerDatePicker } from "@/components/TrackerDatePicker";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { Target, TrendingUp, TrendingDown, Check, X } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Out-of-pocket cost on an order: supplier cost + fees (supplier profit-share is
 // foregone profit, not a cash cost — same convention as Profit & Costs).
@@ -13,15 +16,23 @@ function costOf(orders: Order[]): number {
   return sumCost(orders) + sumFees(orders);
 }
 
-export default async function TrackerPage() {
+export default async function TrackerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  const sp = await searchParams;
   const { all: everything } = await loadOrders();
   // Refunded orders never count toward KPIs.
   const all = everything.filter(notRefunded);
   const today = todayISO();
+  // Selected day drives the whole page (defaults to today, never the future).
+  const sel = ISO_DATE.test(sp.date ?? "") && sp.date! <= today ? sp.date! : today;
+  const isToday = sel === today;
 
-  const now = new Date(today + "T00:00:00Z");
+  const now = new Date(sel + "T00:00:00Z");
   const y = now.getUTCFullYear();
-  const m = now.getUTCMonth(); // 0-based current month
+  const m = now.getUTCMonth(); // 0-based month of the selected day
   const dayOfMonth = now.getUTCDate();
 
   // KPI baseline = the previous full calendar month. Its daily averages become
@@ -49,18 +60,19 @@ export default async function TrackerPage() {
     cost: prevTotals.cost / daysInPrev,
   };
 
-  // Today's actuals.
-  const todays = all.filter((o) => o.date === today);
+  // Selected day's actuals.
+  const dayOrders = all.filter((o) => o.date === sel);
   const actual = {
-    profit: sumProfit(todays),
-    revenue: sumRevenue(todays),
-    orders: todays.length,
-    cost: costOf(todays),
+    profit: sumProfit(dayOrders),
+    revenue: sumRevenue(dayOrders),
+    orders: dayOrders.length,
+    cost: costOf(dayOrders),
   };
 
-  // Month-to-date pace vs where we should be by now.
+  // Month-to-date pace (up to and including the selected day) vs where we
+  // should be by then.
   const monthFrom = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-  const monthOrders = all.filter((o) => !!o.date && o.date >= monthFrom && o.date <= today);
+  const monthOrders = all.filter((o) => !!o.date && o.date >= monthFrom && o.date <= sel);
   const mtdProfit = sumProfit(monthOrders);
   const expectedProfit = target.profit * dayOfMonth;
   const paceDelta = mtdProfit - expectedProfit;
@@ -115,11 +127,16 @@ export default async function TrackerPage() {
         )}
       </Card>
 
-      {/* Today vs target */}
+      {/* Selected day vs target */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-zinc-700">Today — {today}</h2>
-          <span className="text-xs text-zinc-400">{formatNum(actual.orders)} orders so far</span>
+        <div className="flex flex-col gap-3 mb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-sm font-semibold text-zinc-700">{isToday ? "Today" : "On"} — {sel}</h2>
+            <span className="text-xs text-zinc-400">
+              {formatNum(actual.orders)} orders{isToday ? " so far" : ""}
+            </span>
+          </div>
+          <TrackerDatePicker date={sel} today={today} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {tiles.map((t) => {
@@ -158,11 +175,12 @@ export default async function TrackerPage() {
       </div>
 
       {/* Month-to-date pace */}
-      <Card title={`Month-to-date pace — ${today.slice(0, 7)}`}>
+      <Card title={`Month-to-date pace — ${sel.slice(0, 7)}`}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-zinc-500">
             Day {dayOfMonth} of the month — you should be around{" "}
-            <span className="font-mono text-zinc-700">{formatCurrencyPrecise(expectedProfit)}</span> profit by now.
+            <span className="font-mono text-zinc-700">{formatCurrencyPrecise(expectedProfit)}</span> profit by{" "}
+            {isToday ? "now" : sel}.
           </div>
           <div className="flex flex-wrap gap-6">
             <div>
@@ -201,12 +219,14 @@ export default async function TrackerPage() {
                 const profit = sumProfit(d.orders);
                 const empty = d.orders.length === 0;
                 const met = hasBaseline && profit >= target.profit;
-                const isToday = d.date === today;
+                const rowIsToday = d.date === today;
+                const rowIsSel = d.date === sel;
                 return (
-                  <tr key={d.date} className={`hover:bg-zinc-50 transition-colors ${empty ? "text-zinc-300" : ""}`}>
+                  <tr key={d.date} className={`transition-colors ${rowIsSel ? "bg-emerald-50/60" : "hover:bg-zinc-50"} ${empty ? "text-zinc-300" : ""}`}>
                     <td className="py-3 text-sm text-zinc-600 whitespace-nowrap">
                       {d.date}
-                      {isToday && <span className="ml-2 text-[10px] font-medium text-emerald-600 uppercase">today</span>}
+                      {rowIsToday && <span className="ml-2 text-[10px] font-medium text-emerald-600 uppercase">today</span>}
+                      {rowIsSel && !rowIsToday && <span className="ml-2 text-[10px] font-medium text-emerald-600 uppercase">selected</span>}
                     </td>
                     <td className="py-3 text-sm font-mono text-right">{formatNum(d.orders.length)}</td>
                     <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(sumRevenue(d.orders))}</td>
