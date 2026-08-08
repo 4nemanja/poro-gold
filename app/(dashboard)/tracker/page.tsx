@@ -211,7 +211,7 @@ export default async function TrackerPage({
             {milestones.length === 0 ? (
               <p className="text-sm text-zinc-400">No milestones yet — add one with a due date.</p>
             ) : (
-              <ul className="divide-y divide-zinc-100">
+              <ul className="max-h-72 overflow-y-auto divide-y divide-zinc-100 pr-1">
                 {milestones.map((ms) => {
                   const days = Math.round(
                     (Date.parse(ms.due_date + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000,
