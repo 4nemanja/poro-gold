@@ -1,7 +1,7 @@
 import { db } from "./supabase";
 import { statusCategory } from "./orderStatus";
 import { WORKSPACES, type Workspace } from "./workspaces";
-import type { Order, SupplierRecord, BugReport, DailyNote, SupplierTransaction } from "./types";
+import type { Order, SupplierRecord, BugReport, DailyNote, SupplierTransaction, Milestone } from "./types";
 
 // A refunded or cancelled order earned no profit — never count it.
 function earnsProfit(o: Order): boolean {
@@ -169,6 +169,18 @@ async function getConfig<T>(key: string, fallback: T): Promise<T> {
 export async function setConfig(key: string, value: unknown): Promise<void> {
   const { error } = await db().from("app_config").upsert({ key, value });
   if (error) throw new Error(`app_config upsert failed: ${error.message}`);
+}
+
+// Milestones — hand-managed goals with a due date, shown on the Daily Tracker.
+export async function getMilestones(): Promise<Milestone[]> {
+  const list = await getConfig<Milestone[]>("milestones", []);
+  // Soonest due date first; completed ones sink to the bottom.
+  return list.sort((a, b) =>
+    (a.done ? 1 : 0) - (b.done ? 1 : 0) || a.due_date.localeCompare(b.due_date));
+}
+
+export async function saveMilestones(list: Milestone[]): Promise<void> {
+  await setConfig("milestones", list);
 }
 
 export type SyncReportSummary = {

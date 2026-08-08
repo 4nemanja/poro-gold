@@ -1,11 +1,13 @@
-import { sumRevenue, sumCost, sumProfit, sumFees } from "@/lib/data";
+import { sumRevenue, sumCost, sumProfit, sumFees, getMilestones } from "@/lib/data";
 import { loadOrders, todayISO, notRefunded } from "@/lib/ordersView";
 import { Card } from "@/components/ui/Card";
 import { TrackerDatePicker } from "@/components/TrackerDatePicker";
+import { MilestoneModal } from "@/components/MilestoneModal";
+import { MilestoneActions } from "@/components/MilestoneActions";
 import { monthlyProfitGoal } from "@/lib/goals";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import type { Order } from "@/lib/types";
-import { Target, TrendingUp, TrendingDown, Check, X } from "lucide-react";
+import { Target, TrendingUp, TrendingDown, Check, X, Flag } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +28,7 @@ export default async function TrackerPage({
   const { all: everything } = await loadOrders();
   // Refunded orders never count toward KPIs.
   const all = everything.filter(notRefunded);
+  const milestones = await getMilestones();
   const today = todayISO();
   // Selected day drives the whole page (defaults to today, never the future).
   const sel = ISO_DATE.test(sp.date ?? "") && sp.date! <= today ? sp.date! : today;
@@ -166,7 +169,7 @@ export default async function TrackerPage({
           </div>
           <TrackerDatePicker date={sel} today={today} />
         </div>
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {tiles.map((t) => {
             const met = t.hasTarget && t.value >= t.target;
             const pct = t.target > 0 ? Math.round((t.value / t.target) * 100) : 0;
@@ -199,6 +202,46 @@ export default async function TrackerPage({
               </Card>
             );
           })}
+
+          {/* Milestones */}
+          <Card
+            title={<span className="flex items-center gap-2"><Flag size={16} className="text-emerald-600" /> Milestones</span>}
+            action={<MilestoneModal />}
+          >
+            {milestones.length === 0 ? (
+              <p className="text-sm text-zinc-400">No milestones yet — add one with a due date.</p>
+            ) : (
+              <ul className="divide-y divide-zinc-100">
+                {milestones.map((ms) => {
+                  const days = Math.round(
+                    (Date.parse(ms.due_date + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000,
+                  );
+                  const due = new Date(ms.due_date + "T00:00:00Z").toLocaleDateString("en-US", {
+                    month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+                  });
+                  const badge = ms.done
+                    ? { text: "Done", cls: "text-emerald-600" }
+                    : days < 0 ? { text: `${-days}d overdue`, cls: "text-rose-600" }
+                    : days === 0 ? { text: "Due today", cls: "text-amber-600" }
+                    : { text: `in ${days} day${days === 1 ? "" : "s"}`, cls: "text-zinc-500" };
+                  return (
+                    <li key={ms.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <div className={`text-sm font-medium truncate ${ms.done ? "text-zinc-400 line-through" : "text-zinc-800"}`}>
+                          {ms.title}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+                          <span className="text-zinc-400">{due}</span>
+                          <span className={`font-medium ${badge.cls}`}>· {badge.text}</span>
+                        </div>
+                      </div>
+                      <MilestoneActions id={ms.id} done={!!ms.done} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
         </div>
       </div>
 

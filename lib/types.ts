@@ -64,6 +64,14 @@ export type DailyNote = {
   updated_at?: string;
 };
 
+export type Milestone = {
+  id: string;
+  title: string;
+  due_date: string; // YYYY-MM-DD — always required
+  done?: boolean;
+  created_at: string;
+};
+
 // A payment/transfer sent to a supplier. Tracked on the Transactions page.
 // Not tied to any platform — it's just money sent to a supplier. Stored in
 // app_config.
