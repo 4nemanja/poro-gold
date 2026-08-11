@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Truck, Wallet, Zap, LineChart, Bug, Layers, NotebookPen, Package, ArrowLeftRight, Target } from "lucide-react";
+import { LayoutDashboard, Truck, Wallet, Zap, LineChart, Bug, Layers, NotebookPen, Package, ArrowLeftRight, Target, GitCompareArrows } from "lucide-react";
 
 const NAV = [
   { icon: LayoutDashboard, label: "Main Dashboard", href: "/", highlight: true },
   { icon: LineChart, label: "Profit & Costs", href: "/analytics", highlight: true },
+  { icon: GitCompareArrows, label: "Compare Dates", href: "/compare", highlight: true },
   { icon: Target, label: "Daily Tracker", href: "/tracker", highlight: true },
   { icon: Wallet, label: "Investment", href: "/investment", highlight: true },
   { icon: ArrowLeftRight, label: "Transactions", href: "/transactions", highlight: true },
