@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "source-docs", "archived-dashboards"]
+  "exclude": ["node_modules", "source-docs", "archived-dashboards", "discord-bot"]
 }

@@ -66,8 +66,6 @@ export type OrderExtra = {
   withdrawal_fee?: number;
   supplier_share_pct?: number;
   supplier_cut?: number;
-  is_gift?: boolean;
-  vbucks?: number;
 };
 export type OrderExtras = Record<string, OrderExtra>;
 
@@ -79,8 +77,7 @@ export async function setOrderExtra(orderId: string, extra: OrderExtra | null): 
   const all = await getOrderExtras();
   if (
     extra &&
-    (extra.fee_pct || extra.fee || extra.withdrawal_fee || extra.supplier_share_pct || extra.supplier_cut ||
-      extra.is_gift || extra.vbucks)
+    (extra.fee_pct || extra.fee || extra.withdrawal_fee || extra.supplier_share_pct || extra.supplier_cut)
   )
     all[orderId] = extra;
   else delete all[orderId];
@@ -110,8 +107,6 @@ function mergeExtras(orders: Order[], extras: OrderExtras, reasons: RefundReason
       o.withdrawal_fee = e.withdrawal_fee ?? null;
       o.supplier_share_pct = e.supplier_share_pct ?? null;
       o.supplier_cut = e.supplier_cut ?? null;
-      o.is_gift = e.is_gift ?? null;
-      o.vbucks = e.vbucks ?? null;
     }
     o.refund_reason = reasons[o.order_id] ?? null;
   }
@@ -126,13 +121,6 @@ export async function getAllOrders(): Promise<Order[]> {
   ]);
   if (error) throw new Error(`orders query failed: ${error.message}`);
   return mergeExtras((data ?? []).map(rowToOrder), extras, reasons).sort(orderRecencySort);
-}
-
-// Orders flagged as gifts (they also live on the Main Dashboard). Used by the
-// Gift System so gift orders aren't entered or tracked twice.
-export async function getGiftFlaggedOrders(): Promise<Order[]> {
-  const all = await getAllOrders();
-  return all.filter((o) => o.is_gift);
 }
 
 export async function getWorkspaceOrders(workspace: string): Promise<Order[]> {
@@ -160,7 +148,7 @@ export async function getSkus(workspace: string): Promise<Sku[]> {
 }
 
 // --- app_config singletons ---
-async function getConfig<T>(key: string, fallback: T): Promise<T> {
+export async function getConfig<T>(key: string, fallback: T): Promise<T> {
   const { data, error } = await db().from("app_config").select("value").eq("key", key).maybeSingle();
   if (error) throw new Error(`app_config query failed: ${error.message}`);
   return (data?.value as T) ?? fallback;
@@ -208,59 +196,6 @@ export async function getInvestmentBatches(): Promise<InvestmentBatch[]> {
 }
 export async function saveInvestmentBatches(list: InvestmentBatch[]): Promise<void> {
   await setConfig("investment_batches", list);
-}
-
-// --- Gift System ---
-export type GiftConfig = { invested_usd: number; vbucks_stock: number; note: string };
-export type GiftOrder = {
-  id: string;
-  date: string;
-  customer: string | null;
-  vbucks: number;
-  sold_for: number | null;
-  cost: number | null;
-  fee_pct: number | null; // selling fee as a % of sold_for (stored in app_config)
-  status: string; // in_progress | completed | refunded
-  added_at?: string;
-};
-
-// Per-gift fee lives in app_config (the gift_orders table can't be altered here).
-// Stored as a percent of the sale price.
-export type GiftExtras = Record<string, { fee_pct?: number }>;
-export async function getGiftExtras(): Promise<GiftExtras> {
-  return getConfig<GiftExtras>("gift_extras", {});
-}
-export async function setGiftExtra(id: string, feePct: number | null): Promise<void> {
-  const all = await getGiftExtras();
-  if (feePct) all[id] = { fee_pct: feePct };
-  else delete all[id];
-  await setConfig("gift_extras", all);
-}
-
-export async function getGiftConfig(): Promise<GiftConfig> {
-  return getConfig<GiftConfig>("gift_config", { invested_usd: 33, vbucks_stock: 12500, note: "" });
-}
-
-export async function getGiftOrders(): Promise<GiftOrder[]> {
-  const [{ data, error }, extras] = await Promise.all([
-    db().from("gift_orders").select("*"),
-    getGiftExtras(),
-  ]);
-  if (error) throw new Error(`gift_orders query failed: ${error.message}`);
-  return (data ?? []).map((r) => {
-    const id = r.id as string;
-    return {
-      id,
-      date: (r.date as string) ?? "",
-      customer: (r.customer as string) ?? null,
-      vbucks: num(r.vbucks) ?? 0,
-      sold_for: num(r.sold_for),
-      cost: num(r.cost),
-      fee_pct: extras[id]?.fee_pct ?? null,
-      status: (r.status as string) ?? "in_progress",
-      added_at: (r.added_at as string) ?? undefined,
-    };
-  });
 }
 
 // --- Suppliers (managed by hand; stored in app_config) ---
@@ -349,9 +284,12 @@ export function sumSupplierCuts(orders: Order[]): number {
 
 // Net profit math for a single order. BOTH fees come off before any supplier
 // split: the marketplace selling fee and the platform's withdrawal fee (what it
-// costs to get the money off that platform). A splitting supplier takes their %
-// of what's left, so the withdrawal fee is shared, not absorbed by you alone.
-// Supplier only shares in a positive gross (never covers a loss).
+// costs to get the money off that platform). The two fees COMPOUND — the caller
+// passes `withdrawalFee` already computed on the post-selling-fee amount, so this
+// is net = sold_for - cost - sellingFee - withdrawalFee where withdrawalFee itself
+// was taken from (sold_for - sellingFee), NOT the full sale price. A splitting
+// supplier takes their % of what's left, so the withdrawal fee is shared, not
+// absorbed by you alone. Supplier only shares in a positive gross (never a loss).
 export function computeOrderProfit(
   soldFor: number,
   cost: number | null,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Truck, Wallet, Zap, LineChart, Bug, Layers, NotebookPen, Package, ArrowLeftRight, Target, GitCompareArrows } from "lucide-react";
+import { LayoutDashboard, Truck, Wallet, Zap, LineChart, Bug, Layers, NotebookPen, Package, ArrowLeftRight, Target, GitCompareArrows, Globe } from "lucide-react";
 
 const NAV = [
   { icon: LayoutDashboard, label: "Main Dashboard", href: "/", highlight: true },
@@ -12,6 +12,7 @@ const NAV = [
   { icon: Wallet, label: "Investment", href: "/investment", highlight: true },
   { icon: ArrowLeftRight, label: "Transactions", href: "/transactions", highlight: true },
   { icon: Package, label: "Products", href: "/products" },
+  { icon: Globe, label: "By Website", href: "/website" },
   { icon: Truck, label: "Suppliers", href: "/suppliers" },
   { icon: Layers, label: "Batch Analysis", href: "/batches" },
   { icon: NotebookPen, label: "Daily Notes", href: "/notes" },

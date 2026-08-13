@@ -35,10 +35,6 @@ export type Order = {
   withdrawal_fee?: number | null; // $ cost of cashing out, off the platform's %
   supplier_share_pct?: number | null; // % of gross profit the supplier takes
   supplier_cut?: number | null; // $ the supplier takes from gross profit
-  // A gift order is a normal order flagged as a gift so it also shows in the Gift
-  // System — one row, so status stays in sync and it's never duplicated.
-  is_gift?: boolean | null;
-  vbucks?: number | null; // V-Bucks amount when it's a gift order
   // Why an order was refunded (required when status is refunded). Kept even if
   // the status later changes, so it isn't lost. Stored in app_config.
   refund_reason?: string | null;
