@@ -1,4 +1,4 @@
-import { sumRevenue, sumCost, sumProfit, sumFees, getMilestones } from "@/lib/data";
+import { sumRevenue, sumCost, sumProfit, sumFees, getMilestones, BUSINESS_START } from "@/lib/data";
 import { loadOrders, todayISO, notRefunded } from "@/lib/ordersView";
 import { Card } from "@/components/ui/Card";
 import { TrackerDatePicker } from "@/components/TrackerDatePicker";
@@ -7,7 +7,7 @@ import { MilestoneActions } from "@/components/MilestoneActions";
 import { monthlyProfitGoal } from "@/lib/goals";
 import { formatCurrencyPrecise, formatNum } from "@/lib/format";
 import type { Order } from "@/lib/types";
-import { Target, TrendingUp, TrendingDown, Check, X, Flag } from "lucide-react";
+import { Target, TrendingUp, TrendingDown, Check, X, Flag, CalendarRange, CalendarDays } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,25 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 function costOf(orders: Order[]): number {
   return sumCost(orders) + sumFees(orders);
 }
+
+// --- ISO date helpers (all UTC, matching the rest of the app) ---
+function addDays(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+// Monday-based week start for a given day.
+function weekStartOf(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z");
+  const dow = (d.getUTCDay() + 6) % 7; // Mon = 0 … Sun = 6
+  return addDays(iso, -dow);
+}
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86400000);
+}
+const shortDate = (iso: string) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const weekLabel = (start: string) => `${shortDate(start)} – ${shortDate(addDays(start, 6))}`;
 
 export default async function TrackerPage({
   searchParams,
@@ -39,6 +58,8 @@ export default async function TrackerPage({
   const m = now.getUTCMonth(); // 0-based month of the selected day
   const dayOfMonth = now.getUTCDate();
 
+  const inWindow = (from: string, to: string) => all.filter((o) => !!o.date && o.date >= from && o.date <= to);
+
   // KPI baseline = the previous full calendar month. Its daily averages become
   // the targets to beat, and they roll forward automatically each month.
   const prevStart = new Date(Date.UTC(y, m - 1, 1));
@@ -48,7 +69,7 @@ export default async function TrackerPage({
   const daysInPrev = prevEnd.getUTCDate();
   const prevLabel = prevStart.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
-  const prevOrders = all.filter((o) => !!o.date && o.date >= prevFrom && o.date <= prevTo);
+  const prevOrders = inWindow(prevFrom, prevTo);
   const hasBaseline = prevOrders.length > 0;
 
   const prevTotals = {
@@ -64,6 +85,30 @@ export default async function TrackerPage({
     cost: prevTotals.cost / daysInPrev,
   };
 
+  // Per-day profit target for ANY month: that month's goal / days-in-month, else
+  // the month before it as a daily average. Used by every historical row so July
+  // rows are scored against July's target, not August's.
+  const targetCache = new Map<string, number | null>();
+  function dailyTargetForMonth(monthKey: string): number | null {
+    const cached = targetCache.get(monthKey);
+    if (cached !== undefined) return cached;
+    const [yy, mm] = monthKey.split("-").map(Number); // mm is 1-based
+    const dim = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+    const g = monthlyProfitGoal(monthKey);
+    let t: number | null = null;
+    if (g != null) {
+      t = g / dim;
+    } else {
+      const ps = new Date(Date.UTC(yy, mm - 2, 1));
+      const pe = new Date(Date.UTC(yy, mm - 1, 0));
+      const po = inWindow(ps.toISOString().slice(0, 10), pe.toISOString().slice(0, 10));
+      t = po.length ? sumProfit(po) / pe.getUTCDate() : null;
+    }
+    targetCache.set(monthKey, t);
+    return t;
+  }
+  const dailyTargetFor = (iso: string) => dailyTargetForMonth(iso.slice(0, 7));
+
   // A monthly profit goal (if set for the selected month) overrides the
   // baseline: the per-day profit target becomes goal / days-in-month.
   const monthKey = sel.slice(0, 7);
@@ -72,8 +117,9 @@ export default async function TrackerPage({
   const goal = monthlyProfitGoal(monthKey);
   const goalDailyProfit = goal != null ? goal / daysInMonth : null;
   // Effective per-day profit target: goal-driven, else last-month average.
-  const profitTarget = goalDailyProfit ?? (hasBaseline ? target.profit : null);
+  const profitTarget = dailyTargetForMonth(monthKey);
   const hasProfitTarget = profitTarget != null;
+  const weeklyTarget = profitTarget != null ? profitTarget * 7 : null;
 
   // Selected day's actuals.
   const dayOrders = all.filter((o) => o.date === sel);
@@ -87,7 +133,7 @@ export default async function TrackerPage({
   // Month-to-date pace (up to and including the selected day) vs where we
   // should be by then.
   const monthFrom = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-  const monthOrders = all.filter((o) => !!o.date && o.date >= monthFrom && o.date <= sel);
+  const monthOrders = inWindow(monthFrom, sel);
   const mtdProfit = sumProfit(monthOrders);
   const expectedProfit = (profitTarget ?? 0) * dayOfMonth;
   const paceDelta = mtdProfit - expectedProfit;
@@ -97,13 +143,90 @@ export default async function TrackerPage({
   const daysLeft = daysInMonth - dayOfMonth;
   const remaining = goal != null ? goal - mtdProfit : null;
   const neededPerDay = goal != null && daysLeft > 0 ? (remaining as number) / daysLeft : null;
+  // Same figure expressed as a weekly KPI — the rate to hold to land the goal.
+  const neededPerWeek = neededPerDay != null ? neededPerDay * 7 : null;
 
-  // Daily log — last 14 days, newest first, scored against the daily profit target.
+  // --- Week vs week ---------------------------------------------------------
+  // The week containing the selected day (Mon–Sun), compared with the week
+  // before it — both as a like-for-like slice (same number of days elapsed) and
+  // against that week's full total.
+  const thisWeekStart = weekStartOf(sel);
+  const lastWeekStart = addDays(thisWeekStart, -7);
+  const lastWeekEnd = addDays(lastWeekStart, 6);
+  const dayIdx = daysBetween(thisWeekStart, sel); // 0 = Monday
+  const daysElapsed = dayIdx + 1;
+  const daysLeftInWeek = 6 - dayIdx;
+  const weekComplete = daysLeftInWeek === 0;
+
+  const totalsOf = (orders: Order[]) => ({
+    profit: sumProfit(orders),
+    revenue: sumRevenue(orders),
+    cost: costOf(orders),
+    orders: orders.length,
+  });
+  const thisWeek = totalsOf(inWindow(thisWeekStart, sel));
+  const lastWeekSoFar = totalsOf(inWindow(lastWeekStart, addDays(lastWeekStart, dayIdx)));
+  const lastWeekFull = totalsOf(inWindow(lastWeekStart, lastWeekEnd));
+
+  const weekMetrics = [
+    { key: "profit", label: "Profit", now: thisWeek.profit, prev: lastWeekSoFar.profit, full: lastWeekFull.profit, money: true, goodWhenDown: false },
+    { key: "revenue", label: "Revenue", now: thisWeek.revenue, prev: lastWeekSoFar.revenue, full: lastWeekFull.revenue, money: true, goodWhenDown: false },
+    { key: "cost", label: "Costs", now: thisWeek.cost, prev: lastWeekSoFar.cost, full: lastWeekFull.cost, money: true, goodWhenDown: true },
+    { key: "orders", label: "Orders", now: thisWeek.orders, prev: lastWeekSoFar.orders, full: lastWeekFull.orders, money: false, goodWhenDown: false },
+  ];
+
+  // Week-to-date vs the weekly profit target, pro-rated to the days elapsed.
+  const weekTargetSoFar =
+    weeklyTarget != null ? (profitTarget as number) * daysElapsed : null;
+  const weekPct = weeklyTarget && weeklyTarget > 0 ? Math.round((thisWeek.profit / weeklyTarget) * 100) : 0;
+  const weekShortfall = weeklyTarget != null ? weeklyTarget - thisWeek.profit : null;
+  const neededPerDayThisWeek =
+    weekShortfall != null && weekShortfall > 0 && daysLeftInWeek > 0 ? weekShortfall / daysLeftInWeek : null;
+
+  // --- Weekly history (every week since the business started) ---------------
+  const firstWeek = weekStartOf(BUSINESS_START);
+  const currentWeek = weekStartOf(today);
+  const weeks: {
+    start: string;
+    end: string;
+    counted: number;
+    partial: boolean;
+    totals: ReturnType<typeof totalsOf>;
+    target: number | null;
+  }[] = [];
+  for (let w = currentWeek; w >= firstWeek; w = addDays(w, -7)) {
+    const end = addDays(w, 6);
+    // Only score the days that actually exist: no earlier than Jul 1, no later
+    // than today.
+    const from = w < BUSINESS_START ? BUSINESS_START : w;
+    const to = end > today ? today : end;
+    const counted = daysBetween(from, to) + 1;
+    // A week only gets a target if every one of its counted days has one —
+    // otherwise a part-targeted week would be scored against a fraction of a
+    // target and always "hit".
+    let t = 0;
+    let hasT = true;
+    for (let i = 0; i < counted; i++) {
+      const dt = dailyTargetFor(addDays(from, i));
+      if (dt == null) hasT = false;
+      else t += dt;
+    }
+    weeks.push({
+      start: w,
+      end,
+      counted,
+      partial: counted < 7,
+      totals: totalsOf(inWindow(from, to)),
+      target: hasT ? t : null,
+    });
+  }
+
+  // --- Daily log: every day since the business started, newest first --------
   const log: { date: string; orders: Order[] }[] = [];
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(Date.UTC(y, m, dayOfMonth - i)).toISOString().slice(0, 10);
+  for (let d = today; d >= BUSINESS_START; d = addDays(d, -1)) {
     log.push({ date: d, orders: all.filter((o) => o.date === d) });
   }
+  const logTotals = totalsOf(inWindow(BUSINESS_START, today));
 
   const tiles = [
     { key: "profit", label: "Profit", value: actual.profit, target: profitTarget ?? 0, hasTarget: hasProfitTarget, money: true },
@@ -138,7 +261,8 @@ export default async function TrackerPage({
               profit over {daysInMonth} days
             </div>
             <div className="flex flex-wrap gap-6">
-              <TargetStat label="Profit / day" value={formatCurrencyPrecise(profitTarget as number)} />
+              <TargetStat label="Profit / day" value={formatCurrencyPrecise(goalDailyProfit as number)} />
+              <TargetStat label="Profit / week" value={formatCurrencyPrecise((goalDailyProfit as number) * 7)} />
             </div>
           </div>
         ) : hasBaseline ? (
@@ -149,6 +273,7 @@ export default async function TrackerPage({
             </div>
             <div className="flex flex-wrap gap-6">
               <TargetStat label="Profit / day" value={formatCurrencyPrecise(target.profit)} />
+              <TargetStat label="Profit / week" value={formatCurrencyPrecise(target.profit * 7)} />
             </div>
           </div>
         ) : (
@@ -245,6 +370,198 @@ export default async function TrackerPage({
         </div>
       </div>
 
+      {/* Week vs week */}
+      <Card
+        title={
+          <span className="flex items-center gap-2">
+            <CalendarRange size={16} className="text-emerald-600" /> This week vs last week
+          </span>
+        }
+        action={
+          <span className="text-xs text-zinc-400">
+            {weekLabel(thisWeekStart)} vs {weekLabel(lastWeekStart)}
+          </span>
+        }
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {weekMetrics.map((w) => {
+            const fmt = (n: number) => (w.money ? formatCurrencyPrecise(n) : formatNum(Math.round(n)));
+            const delta = w.now - w.prev;
+            const up = delta >= 0;
+            const good = w.goodWhenDown ? delta <= 0 : delta >= 0;
+            const pct = w.prev !== 0 ? Math.round((delta / Math.abs(w.prev)) * 100) : null;
+            return (
+              <div key={w.key} className="rounded-lg border border-zinc-200 p-3">
+                <div className="text-xs uppercase text-zinc-400">{w.label}</div>
+                <div className="mt-1 font-mono text-xl font-bold text-zinc-900">{fmt(w.now)}</div>
+                <div className="mt-1.5 flex items-center gap-1">
+                  <span className={`flex items-center gap-0.5 text-xs font-medium ${good ? "text-emerald-600" : "text-rose-600"}`}>
+                    {up ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                    {pct == null ? (w.now === 0 ? "—" : "new") : `${pct > 0 ? "+" : ""}${pct}%`}
+                  </span>
+                  <span className="text-xs text-zinc-400">vs {fmt(w.prev)}</span>
+                </div>
+                <div className="mt-1 text-[11px] text-zinc-400">
+                  last week full: <span className="font-mono">{fmt(w.full)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 text-xs text-zinc-400">
+          {weekComplete
+            ? `Full week (7 days) vs the same 7 days last week.`
+            : `Day ${daysElapsed} of 7 — compared with the first ${daysElapsed} day${daysElapsed === 1 ? "" : "s"} of last week.`}
+        </div>
+
+        {/* Weekly KPI */}
+        <div className="mt-4 border-t border-zinc-100 pt-4">
+          {weeklyTarget != null ? (
+            <>
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div className="text-xs uppercase text-zinc-400">Weekly profit KPI</div>
+                  <div className="mt-1 font-mono text-lg font-bold text-zinc-900">
+                    {formatCurrencyPrecise(thisWeek.profit)}{" "}
+                    <span className="text-sm font-normal text-zinc-400">of {formatCurrencyPrecise(weeklyTarget)}</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-6">
+                  <div>
+                    <div className="text-xs uppercase text-zinc-400">Pace so far</div>
+                    <div
+                      className={`font-mono text-lg font-bold ${
+                        thisWeek.profit >= (weekTargetSoFar as number) ? "text-emerald-600" : "text-rose-600"
+                      }`}
+                    >
+                      {thisWeek.profit >= (weekTargetSoFar as number) ? "+" : "−"}
+                      {formatCurrencyPrecise(Math.abs(thisWeek.profit - (weekTargetSoFar as number)))}
+                    </div>
+                  </div>
+                  {goal != null && neededPerWeek != null && (
+                    <div>
+                      <div className="text-xs uppercase text-zinc-400">Need / week for goal</div>
+                      <div className="font-mono text-lg font-bold text-emerald-600">
+                        {formatCurrencyPrecise(Math.max(0, neededPerWeek))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${weekPct >= 100 ? "bg-emerald-500" : "bg-amber-400"}`}
+                  style={{ width: `${Math.min(100, Math.max(0, weekPct))}%` }}
+                />
+              </div>
+              <div className="mt-2 text-sm text-zinc-500">
+                {weekShortfall != null && weekShortfall <= 0 ? (
+                  <>Weekly target hit — {formatCurrencyPrecise(-weekShortfall)} over. 🎉</>
+                ) : neededPerDayThisWeek != null ? (
+                  <>
+                    {weekPct}% of the weekly target — you need{" "}
+                    <span className="font-mono text-zinc-700">{formatCurrencyPrecise(neededPerDayThisWeek)}</span>/day for
+                    the remaining {daysLeftInWeek} day{daysLeftInWeek === 1 ? "" : "s"} of this week.
+                  </>
+                ) : (
+                  <>
+                    Week closed at {weekPct}% of target — short by{" "}
+                    <span className="font-mono text-zinc-700">{formatCurrencyPrecise(weekShortfall as number)}</span>.
+                  </>
+                )}
+                {goal != null && neededPerWeek != null && neededPerWeek > 0 && (
+                  <>
+                    {" "}To land the {monthLabel} goal of {formatCurrencyPrecise(goal)} you need{" "}
+                    <span className="font-mono text-zinc-700">{formatCurrencyPrecise(neededPerWeek)}</span>/week from here.
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-sm text-zinc-500">No weekly target yet — set a monthly goal to get one.</div>
+          )}
+        </div>
+      </Card>
+
+      {/* Weekly progress */}
+      <Card
+        title="Weekly Progress"
+        action={<span className="text-xs text-zinc-400">every week since {shortDate(BUSINESS_START)} · Mon–Sun</span>}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-200">
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Week</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Orders</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Revenue</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Costs</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Profit</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">vs prev week</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Target</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-center">Hit</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200">
+              {weeks.map((w, i) => {
+                const prev = weeks[i + 1]; // rows are newest-first
+                const delta = prev ? w.totals.profit - prev.totals.profit : null;
+                const pct = prev && prev.totals.profit !== 0 ? Math.round((delta! / Math.abs(prev.totals.profit)) * 100) : null;
+                const met = w.target != null && w.totals.profit >= w.target;
+                const isSelWeek = w.start === thisWeekStart;
+                const empty = w.totals.orders === 0;
+                return (
+                  <tr
+                    key={w.start}
+                    className={`transition-colors ${isSelWeek ? "bg-emerald-50/60" : "hover:bg-zinc-50"} ${empty ? "text-zinc-300" : ""}`}
+                  >
+                    <td className="py-3 text-sm text-zinc-600 whitespace-nowrap">
+                      {weekLabel(w.start)}
+                      {w.partial && <span className="ml-2 text-[10px] font-medium text-zinc-400 uppercase">{w.counted}d</span>}
+                      {isSelWeek && <span className="ml-2 text-[10px] font-medium text-emerald-600 uppercase">this week</span>}
+                    </td>
+                    <td className="py-3 text-sm font-mono text-right">{formatNum(w.totals.orders)}</td>
+                    <td className="py-3 text-sm font-mono text-zinc-700 text-right">{formatCurrencyPrecise(w.totals.revenue)}</td>
+                    <td className="py-3 text-sm font-mono text-rose-600 text-right">{formatCurrencyPrecise(w.totals.cost)}</td>
+                    <td className={`py-3 text-sm font-mono text-right ${empty ? "" : w.totals.profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {formatCurrencyPrecise(w.totals.profit)}
+                    </td>
+                    <td className="py-3 text-sm font-mono text-right">
+                      {delta == null ? (
+                        <span className="text-zinc-300">—</span>
+                      ) : (
+                        <span className={delta >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                          {delta >= 0 ? "+" : "−"}
+                          {formatCurrencyPrecise(Math.abs(delta))}
+                          {pct != null && <span className="text-zinc-400"> ({pct > 0 ? "+" : ""}{pct}%)</span>}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 text-sm font-mono text-zinc-400 text-right">
+                      {w.target != null ? formatCurrencyPrecise(w.target) : "—"}
+                    </td>
+                    <td className="py-3 text-center">
+                      {w.target == null ? (
+                        <span className="text-zinc-300">—</span>
+                      ) : met ? (
+                        <Check size={16} className="inline text-emerald-600" />
+                      ) : (
+                        <X size={16} className="inline text-rose-400" />
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs text-zinc-400">
+          Partial weeks (the current one, and the first week from {shortDate(BUSINESS_START)}) are scored against a
+          pro-rated target for the days they cover.
+        </p>
+      </Card>
+
       {/* Month-to-date pace */}
       <Card
         title={`Month-to-date pace — ${sel.slice(0, 7)}`}
@@ -261,8 +578,9 @@ export default async function TrackerPage({
                 {daysLeft > 0 ? (
                   <>
                     you need{" "}
-                    <span className="font-mono text-zinc-700">{formatCurrencyPrecise(neededPerDay as number)}</span>/day for
-                    the remaining {daysLeft} day{daysLeft === 1 ? "" : "s"}.
+                    <span className="font-mono text-zinc-700">{formatCurrencyPrecise(neededPerDay as number)}</span>/day (
+                    <span className="font-mono text-zinc-700">{formatCurrencyPrecise(neededPerWeek as number)}</span>/week)
+                    for the remaining {daysLeft} day{daysLeft === 1 ? "" : "s"}.
                   </>
                 ) : (
                   <>the month is over — short by {formatCurrencyPrecise(remaining as number)}.</>
@@ -296,26 +614,39 @@ export default async function TrackerPage({
         </div>
       </Card>
 
-      {/* Daily log */}
-      <Card title="Daily Log" action={<span className="text-xs text-zinc-400">last 14 days · vs profit target</span>}>
-        <div className="overflow-x-auto">
+      {/* Daily log — every day since the business started */}
+      <Card
+        title={
+          <span className="flex items-center gap-2">
+            <CalendarDays size={16} className="text-emerald-600" /> Daily Log
+          </span>
+        }
+        action={
+          <span className="text-xs text-zinc-400">
+            all {formatNum(log.length)} days since {shortDate(BUSINESS_START)} ·{" "}
+            <span className="font-mono text-emerald-600">{formatCurrencyPrecise(logTotals.profit)}</span> profit
+          </span>
+        }
+      >
+        <div className="max-h-[560px] overflow-y-auto overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-white">
               <tr className="border-b border-zinc-200">
-                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase">Date</th>
-                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Orders</th>
-                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Revenue</th>
-                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Costs</th>
-                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Profit</th>
-                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right">Target</th>
-                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-center">Hit</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase bg-white">Date</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right bg-white">Orders</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right bg-white">Revenue</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right bg-white">Costs</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right bg-white">Profit</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-right bg-white">Target</th>
+                <th className="pb-3 text-xs font-medium text-zinc-500 uppercase text-center bg-white">Hit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
               {log.map((d) => {
                 const profit = sumProfit(d.orders);
                 const empty = d.orders.length === 0;
-                const met = hasProfitTarget && profit >= (profitTarget as number);
+                const rowTarget = dailyTargetFor(d.date);
+                const met = rowTarget != null && profit >= rowTarget;
                 const rowIsToday = d.date === today;
                 const rowIsSel = d.date === sel;
                 return (
@@ -331,9 +662,9 @@ export default async function TrackerPage({
                     <td className={`py-3 text-sm font-mono text-right ${empty ? "" : profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                       {formatCurrencyPrecise(profit)}
                     </td>
-                    <td className="py-3 text-sm font-mono text-zinc-400 text-right">{hasProfitTarget ? formatCurrencyPrecise(profitTarget as number) : "—"}</td>
+                    <td className="py-3 text-sm font-mono text-zinc-400 text-right">{rowTarget != null ? formatCurrencyPrecise(rowTarget) : "—"}</td>
                     <td className="py-3 text-center">
-                      {empty ? (
+                      {empty || rowTarget == null ? (
                         <span className="text-zinc-300">—</span>
                       ) : met ? (
                         <Check size={16} className="inline text-emerald-600" />
@@ -347,6 +678,10 @@ export default async function TrackerPage({
             </tbody>
           </table>
         </div>
+        <p className="mt-3 text-xs text-zinc-400">
+          Each day is scored against its own month&apos;s target (that month&apos;s goal ÷ days, else the month
+          before it as a daily average). Months with neither show no target.
+        </p>
       </Card>
     </div>
   );
