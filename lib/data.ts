@@ -113,24 +113,53 @@ function mergeExtras(orders: Order[], extras: OrderExtras, reasons: RefundReason
   return orders;
 }
 
+// PostgREST caps every response at 1000 rows. A plain .select() therefore
+// silently drops orders once the table passes 1000 rows since BUSINESS_START —
+// and because the tail (newest inserts) is what gets cut, recently-added orders
+// vanish from every view. Page through with .range() until a short page comes
+// back so totals stay correct no matter how many orders exist. Ordered by
+// order_id (the primary key) so paging is stable; callers re-sort by recency.
+const ORDERS_PAGE = 1000;
+
+// Base query for orders since the business start. Its inferred type drives the
+// `narrow` callback below so we don't have to name PostgREST's builder generics.
+function ordersSinceStart() {
+  return db().from("orders").select("*").gte("date", BUSINESS_START);
+}
+type OrdersQuery = ReturnType<typeof ordersSinceStart>;
+
+async function fetchOrdersSince(
+  narrow: (q: OrdersQuery) => OrdersQuery = (q) => q,
+): Promise<Record<string, unknown>[]> {
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += ORDERS_PAGE) {
+    const { data, error } = await narrow(ordersSinceStart())
+      .order("order_id", { ascending: true })
+      .range(from, from + ORDERS_PAGE - 1);
+    if (error) throw new Error(`orders query failed: ${error.message}`);
+    const batch = (data ?? []) as Record<string, unknown>[];
+    rows.push(...batch);
+    if (batch.length < ORDERS_PAGE) break;
+  }
+  return rows;
+}
+
 export async function getAllOrders(): Promise<Order[]> {
-  const [{ data, error }, extras, reasons] = await Promise.all([
-    db().from("orders").select("*").gte("date", BUSINESS_START),
+  const [rows, extras, reasons] = await Promise.all([
+    fetchOrdersSince(),
     getOrderExtras(),
     getRefundReasons(),
   ]);
-  if (error) throw new Error(`orders query failed: ${error.message}`);
-  return mergeExtras((data ?? []).map(rowToOrder), extras, reasons).sort(orderRecencySort);
+  return mergeExtras(rows.map(rowToOrder), extras, reasons).sort(orderRecencySort);
 }
 
 export async function getWorkspaceOrders(workspace: string): Promise<Order[]> {
-  const [{ data, error }, extras, reasons] = await Promise.all([
-    db().from("orders").select("*").eq("workspace", workspace).gte("date", BUSINESS_START),
+  const [rows, extras, reasons] = await Promise.all([
+    fetchOrdersSince((q) => q.eq("workspace", workspace)),
     getOrderExtras(),
     getRefundReasons(),
   ]);
-  if (error) throw new Error(`orders query failed: ${error.message}`);
-  return mergeExtras((data ?? []).map(rowToOrder), extras, reasons).sort(orderRecencySort);
+  return mergeExtras(rows.map(rowToOrder), extras, reasons).sort(orderRecencySort);
 }
 
 // --- SKU catalog ---
