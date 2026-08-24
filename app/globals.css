@@ -95,3 +95,20 @@ html.dark { color-scheme: dark; }
 .dark .hover\:text-rose-600:hover { color: #fb7185; }
 .dark .hover\:text-emerald-700:hover { color: #34d399; }
 .dark .hover\:border-zinc-300:hover { border-color: #3f3f46; }
+
+/* ---------------------------------------------------------------------------
+   Print / Save-as-PDF. Used by the Weekly Review's "Save as PDF" button: drop
+   the app chrome (sidebar, topbar, filter controls), let the content run the
+   full page width, and keep cards from being split across a page break.
+--------------------------------------------------------------------------- */
+@media print {
+  aside, header { display: none !important; }
+  main { margin-left: 0 !important; }
+  main > div { padding: 0 !important; max-width: none !important; }
+  body { background: #ffffff !important; }
+  /* Cards and tables read badly when torn in half by a page break. */
+  main .rounded-xl { break-inside: avoid; box-shadow: none !important; }
+  main table { break-inside: auto; }
+  main tr { break-inside: avoid; }
+  @page { size: A4 landscape; margin: 12mm; }
+}

@@ -307,6 +307,12 @@ export function sumProfit(orders: Order[]): number {
 export function sumFees(orders: Order[]): number {
   return orders.reduce((acc, o) => acc + (o.fee ?? 0), 0);
 }
+// The platform's withdrawal fee is a separate real cost from the marketplace
+// selling fee, and `profit` already nets it out. Summing it is what lets a
+// revenue → profit breakdown actually reconcile; `sumFees` alone leaves a gap.
+export function sumWithdrawalFees(orders: Order[]): number {
+  return orders.reduce((acc, o) => acc + (o.withdrawal_fee ?? 0), 0);
+}
 export function sumSupplierCuts(orders: Order[]): number {
   return orders.reduce((acc, o) => acc + (o.supplier_cut ?? 0), 0);
 }
