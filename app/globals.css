@@ -97,6 +97,15 @@ html.dark { color-scheme: dark; }
 .dark .hover\:border-zinc-300:hover { border-color: #3f3f46; }
 
 /* ---------------------------------------------------------------------------
+   Public landing page (/landing). The root layout paints the body zinc-50 (or
+   #0b0b0e in dark mode) for the dashboard, which shows through on overscroll
+   behind the landing page's navy. Match the body to the page instead, and keep
+   it fixed regardless of the dashboard's light/dark toggle.
+--------------------------------------------------------------------------- */
+body:has(#porogold-landing),
+.dark body:has(#porogold-landing) { background-color: #070b20; }
+
+/* ---------------------------------------------------------------------------
    Print / Save-as-PDF. Used by the Weekly Review's "Save as PDF" button: drop
    the app chrome (sidebar, topbar, filter controls), let the content run the
    full page width, and keep cards from being split across a page break.

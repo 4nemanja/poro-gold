@@ -10,6 +10,12 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // The public marketing site. Unlike the rest of the app it has no session and
+  // must stay reachable to anyone, so it bypasses the cookie check entirely.
+  if (pathname === "/landing" || pathname.startsWith("/landing/")) {
+    return NextResponse.next();
+  }
+
   // Marketplace webhooks (G2G, iGV) are called by external services with no
   // session cookie — they authenticate via their own HMAC signature, verified
   // inside each route handler. They must bypass the app's cookie auth.
