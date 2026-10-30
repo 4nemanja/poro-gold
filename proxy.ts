@@ -12,7 +12,11 @@ export function proxy(req: NextRequest) {
 
   // The public marketing site. Unlike the rest of the app it has no session and
   // must stay reachable to anyone, so it bypasses the cookie check entirely.
-  if (pathname === "/landing" || pathname.startsWith("/landing/")) {
+  if (
+    pathname === "/landing" ||
+    pathname.startsWith("/landing/") ||
+    pathname === "/catalog"
+  ) {
     return NextResponse.next();
   }
 
