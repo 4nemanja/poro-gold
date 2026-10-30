@@ -24,9 +24,10 @@ export const metadata: Metadata = {
 /* ---------------------------------------------------------------------------
    The public catalogue. No prices on purpose — this page is for showing people
    the range; pricing is handled in chat. To add a product, drop it into the
-   right category below. `tint` is the monogram colour on its tile.
+   right category below and save its app icon as
+   public/catalog-icons/<slug>.png (128×128, slug from iconSlug(name)).
 --------------------------------------------------------------------------- */
-type Item = { name: string; detail: string; tint: string };
+type Item = { name: string; detail: string };
 
 const CATEGORIES: {
   id: string;
@@ -41,15 +42,15 @@ const CATEGORIES: {
     title: "Games",
     lead: "In-game currency, passes and packs, topped up straight to your account.",
     items: [
-      { name: "PUBG Mobile", detail: "UC & Royale Pass", tint: "#F59E0B" },
-      { name: "Fortnite", detail: "V-Bucks & Crew", tint: "#8B5CF6" },
-      { name: "Pokémon GO", detail: "PokéCoins", tint: "#EF4444" },
-      { name: "Mobile Legends", detail: "Diamonds & passes", tint: "#3B82F6" },
-      { name: "Kingshot", detail: "Gems & packs", tint: "#EAB308" },
-      { name: "Whiteout Survival", detail: "Gems & packs", tint: "#38BDF8" },
-      { name: "Coin Master", detail: "Spins & coins", tint: "#F97316" },
-      { name: "Archero 2", detail: "Gems & packs", tint: "#22C55E" },
-      { name: "Plague Inc.", detail: "Premium content", tint: "#DC2626" },
+      { name: "PUBG Mobile", detail: "UC & Royale Pass" },
+      { name: "Fortnite", detail: "V-Bucks & Crew" },
+      { name: "Pokémon GO", detail: "PokéCoins" },
+      { name: "Mobile Legends", detail: "Diamonds & passes" },
+      { name: "Kingshot", detail: "Gems & packs" },
+      { name: "Whiteout Survival", detail: "Gems & packs" },
+      { name: "Coin Master", detail: "Spins & coins" },
+      { name: "Archero 2", detail: "Gems & packs" },
+      { name: "Plague Inc.", detail: "Premium content" },
     ],
   },
   {
@@ -58,11 +59,11 @@ const CATEGORIES: {
     title: "Streaming & Music",
     lead: "Premium plans for the apps you already use every day.",
     items: [
-      { name: "Netflix", detail: "Premium plans", tint: "#E50914" },
-      { name: "YouTube", detail: "YouTube Premium", tint: "#FF3B3B" },
-      { name: "Spotify", detail: "Spotify Premium", tint: "#1DB954" },
-      { name: "Deezer", detail: "Deezer Premium", tint: "#A238FF" },
-      { name: "SoundCloud", detail: "SoundCloud Go+", tint: "#FF5500" },
+      { name: "Netflix", detail: "Premium plans" },
+      { name: "YouTube", detail: "YouTube Premium" },
+      { name: "Spotify", detail: "Spotify Premium" },
+      { name: "Deezer", detail: "Deezer Premium" },
+      { name: "SoundCloud", detail: "SoundCloud Go+" },
     ],
   },
   {
@@ -71,11 +72,11 @@ const CATEGORIES: {
     title: "Creative & Productivity",
     lead: "Pro tiers for design, writing, notes and meetings.",
     items: [
-      { name: "Canva", detail: "Canva Pro", tint: "#00C4CC" },
-      { name: "Picsart", detail: "Picsart Pro", tint: "#C026D3" },
-      { name: "Notion", detail: "Plus & AI", tint: "#E5E7EB" },
-      { name: "Grammarly", detail: "Grammarly Pro", tint: "#15C39A" },
-      { name: "Zoom", detail: "Zoom Pro", tint: "#2D8CFF" },
+      { name: "Canva", detail: "Canva Pro" },
+      { name: "Picsart", detail: "Picsart Pro" },
+      { name: "Notion", detail: "Plus & AI" },
+      { name: "Grammarly", detail: "Grammarly Pro" },
+      { name: "Zoom", detail: "Zoom Pro" },
     ],
   },
   {
@@ -84,8 +85,8 @@ const CATEGORIES: {
     title: "Learning",
     lead: "Keep the streak going, or pick up a new skill.",
     items: [
-      { name: "Duolingo", detail: "Super & Max", tint: "#58CC02" },
-      { name: "LinkedIn Learning", detail: "Full course library", tint: "#0A66C2" },
+      { name: "Duolingo", detail: "Super & Max" },
+      { name: "LinkedIn Learning", detail: "Full course library" },
     ],
   },
   {
@@ -94,8 +95,8 @@ const CATEGORIES: {
     title: "Cloud & Privacy",
     lead: "Storage and private email, VPN and drive.",
     items: [
-      { name: "Google One", detail: "Storage plans", tint: "#4285F4" },
-      { name: "Proton", detail: "Mail, VPN & Drive", tint: "#6D4AFF" },
+      { name: "Google One", detail: "Storage plans" },
+      { name: "Proton", detail: "Mail, VPN & Drive" },
     ],
   },
   {
@@ -103,7 +104,7 @@ const CATEGORIES: {
     icon: Heart,
     title: "Social & Dating",
     lead: "Yes, really.",
-    items: [{ name: "Tinder", detail: "Plus, Gold & Platinum", tint: "#FE3C72" }],
+    items: [{ name: "Tinder", detail: "Plus, Gold & Platinum" }],
   },
 ];
 
@@ -225,7 +226,7 @@ export default function CatalogPage() {
                   key={item.name}
                   className="group flex items-center gap-3.5 rounded-2xl border border-white/10 bg-[#0B1130] p-4 transition-colors hover:border-[#8B5CF6]/45"
                 >
-                  <Monogram name={item.name} tint={item.tint} />
+                  <AppIcon name={item.name} />
                   <div className="min-w-0">
                     <p className="truncate font-semibold tracking-tight">{item.name}</p>
                     <p className="truncate text-xs text-white/50">{item.detail}</p>
@@ -300,15 +301,27 @@ export default function CatalogPage() {
 
 /* --------------------------------------------------------------- partials */
 
-function Monogram({ name, tint }: { name: string; tint: string }) {
+// "Pokémon GO" -> "pokemon-go", "Plague Inc." -> "plague-inc".
+function iconSlug(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ.]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+}
+
+function AppIcon({ name }: { name: string }) {
   return (
-    <span
-      aria-hidden
-      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold"
-      style={{ backgroundColor: `${tint}26`, color: tint, boxShadow: `inset 0 0 0 1px ${tint}40` }}
-    >
-      {name[0]}
-    </span>
+    // Plain <img>: 24 tiny static PNGs, nothing for the optimizer to win.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/catalog-icons/${iconSlug(name)}.png`}
+      alt=""
+      width={44}
+      height={44}
+      loading="lazy"
+      className="h-11 w-11 shrink-0 rounded-xl ring-1 ring-white/10"
+    />
   );
 }
 

@@ -15,7 +15,8 @@ export function proxy(req: NextRequest) {
   if (
     pathname === "/landing" ||
     pathname.startsWith("/landing/") ||
-    pathname === "/catalog"
+    pathname === "/catalog" ||
+    pathname.startsWith("/catalog-icons/")
   ) {
     return NextResponse.next();
   }
