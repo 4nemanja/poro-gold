@@ -1,7 +1,0 @@
-{
-  "hooks": {
-    "SessionStart": [
-      { "matcher": "startup|resume", "hooks": [ { "type": "command", "command": "git -C \"${CLAUDE_PROJECT_DIR}\" pull --ff-only --quiet || echo 'git pull skipped (local changes or offline)'", "timeout": 60, "statusMessage": "Downloading latest from GitHub..." } ] }
-    ]
-  }
-}
